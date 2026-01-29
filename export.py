@@ -8,10 +8,15 @@ from PIL import Image, ImageDraw, ImageFont  #Import PIL (Pillow) untuk image pr
 from config import DB_FILE, Resampling  #Import konfigurasi database file dan resampling method dari config.py
 
 
-def execute_export(sql_filter="", date_range_desc="", export_label="", current_preset=""):
+def execute_export(sql_filter="", date_range_desc="", export_label="", current_preset="", progress_callback=None):
     # Fungsi utama untuk mengeksekusi proses export ke Excel dengan filter | Tujuan: Create Excel file dari database dengan styling dan gambar
-    # Parameter: sql_filter (WHERE clause), date_range_desc (deskripsi range), export_label (label filter), current_preset (JIS/DIN)
+    # Parameter: sql_filter (WHERE clause), date_range_desc (deskripsi range), export_label (label filter), current_preset (JIS/DIN), progress_callback (fungsi untuk update progress)
     # Return: String path ke file Excel yang dibuat, atau error message jika gagal
+    
+    # Helper function untuk update progress
+    def update_progress(current, total, message=""):
+        if progress_callback:
+            progress_callback(current, total, message)
     
     # Generate nama file Excel dengan timestamp agar unik
     # Format: Karton_Report_YYYYMMDD_HHMMSS.xlsx
@@ -26,8 +31,12 @@ def execute_export(sql_filter="", date_range_desc="", export_label="", current_p
     temp_files_to_clean = []
 
     try:
+        update_progress(0, 100, "Membuka database...")
+        
         conn = sqlite3.connect(DB_FILE) #Buka koneksi ke database SQLite
         cursor = conn.cursor() #Buat cursor untuk execute query
+        
+        update_progress(5, 100, "Memeriksa struktur database...")
         
         # Check kolom apa saja yang ada di table
         # PRAGMA table_info mengembalikan informasi struktur tabel
@@ -38,6 +47,8 @@ def execute_export(sql_filter="", date_range_desc="", export_label="", current_p
         # Ini untuk backward compatibility dengan database lama yang mungkin belum punya kolom ini
         has_status = 'status' in columns
         has_target_session = 'target_session' in columns
+        
+        update_progress(10, 100, "Mengambil data dari database...")
         
         # Build query berdasarkan schema yang ada
         # Jika kolom status dan target_session ada, gunakan kolom asli
@@ -57,7 +68,10 @@ def execute_export(sql_filter="", date_range_desc="", export_label="", current_p
         # Jika tidak ada data, return early dengan kode "NO_DATA"
         # Parent function akan handle message ini untuk tampilkan ke user
         if df.empty:
+            update_progress(100, 100, "Tidak ada data")
             return "NO_DATA"
+
+        update_progress(15, 100, "Memproses data...")
 
         # Gunakan current_preset dari parameter
         # Preset menentukan standard battery (JIS/DIN)
@@ -83,6 +97,8 @@ def execute_export(sql_filter="", date_range_desc="", export_label="", current_p
         else:
             label_display = "All Labels"
 
+        update_progress(20, 100, "Menghitung statistik...")
+
         # Hitung statistik untuk ditampilkan di header Excel
         qty_actual = len(df)  # Total semua data
         qty_ok = len(df[df['status'] == 'OK'])  # Jumlah data dengan status OK
@@ -93,6 +109,8 @@ def execute_export(sql_filter="", date_range_desc="", export_label="", current_p
         # Row 7 adalah header tabel (No, Image, Label, Date/Time, dll)
         # Row 8 dst adalah data
         START_ROW_DATA = 7
+
+        update_progress(25, 100, "Menyiapkan data untuk Excel...")
 
         # Prepare data untuk Excel
         # Konversi kolom timestamp ke datetime object untuk formatting yang benar
@@ -119,6 +137,8 @@ def execute_export(sql_filter="", date_range_desc="", export_label="", current_p
         # Urutan: No, Image, Label, Date/Time, Standard, Status, Image Path (hidden), Target Session (hidden)
         df = df[['No', 'Image', 'Label', 'Date/Time', 'Standard', 'Status', 'Image Path', 'Target Session']]
 
+        update_progress(30, 100, "Membuat file Excel...")
+
         # Buat Excel file dengan xlsxwriter engine
         # xlsxwriter memberikan kontrol penuh atas formatting, styling, dan insert image
         writer = pd.ExcelWriter(output_path, engine='xlsxwriter')
@@ -133,6 +153,8 @@ def execute_export(sql_filter="", date_range_desc="", export_label="", current_p
         # Ambil workbook dan worksheet object untuk formatting
         workbook = writer.book
         worksheet = writer.sheets[sheet_name]
+        
+        update_progress(35, 100, "Mengatur format Excel...")
         
         # Define format untuk header tabel (row 7)
         # Bold, centered, abu-abu background
@@ -205,9 +227,17 @@ def execute_export(sql_filter="", date_range_desc="", export_label="", current_p
         worksheet.set_column('G:G', 0, options={'hidden': True})  # Hide path column - tidak perlu ditampilkan
         worksheet.set_column('H:H', 0, options={'hidden': True})  # Hide target session column - tidak perlu ditampilkan
 
+        update_progress(40, 100, "Menulis data ke Excel...")
+
         # Iterate setiap row data dan tulis ke Excel
         # iterrows() mengembalikan (index, row_data) untuk setiap baris
+        total_rows = len(df)
         for row_num, row_data in df.iterrows():
+            # Update progress setiap 10 rows atau di row terakhir
+            if row_num % 10 == 0 or row_num == total_rows - 1:
+                progress = 40 + int((row_num / total_rows) * 50)  # 40-90% untuk processing rows
+                update_progress(progress, 100, f"Memproses baris {row_num + 1} dari {total_rows}...")
+            
             excel_row = row_num + START_ROW_DATA #Hitung posisi row di Excel (row_num dari DataFrame + START_ROW_DATA)
             
             # Ambil image path dan status dari data row
@@ -331,7 +361,11 @@ def execute_export(sql_filter="", date_range_desc="", export_label="", current_p
             # Kolom H: Target Session (hidden column - untuk reference jika perlu)
             worksheet.write(excel_row, 7, row_data['Target Session'], cell_format)
 
+        update_progress(90, 100, "Menyimpan file Excel...")
+        
         writer.close() # Close Excel writer
+
+        update_progress(95, 100, "Membersihkan file temporary...")
 
         # Cleanup temporary files
         # Hapus semua file thumbnail yang dibuat selama proses
@@ -343,11 +377,14 @@ def execute_export(sql_filter="", date_range_desc="", export_label="", current_p
                     # Jika gagal hapus (file locked), skip saja
                     pass
 
+        update_progress(100, 100, "Export selesai!")
         return output_path #Return path file Excel yang berhasil dibuat
 
     except Exception as e:
         # Jika terjadi error di proses manapun, print error message
         print(f"Export error: {e}")
+        
+        update_progress(100, 100, f"Error: {e}")
         
         # Cleanup temp files jika terjadi error
         # Penting untuk cleanup walau error untuk hindari file sampah

@@ -2,7 +2,7 @@ from PySide6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QGridLayout,
     QPushButton, QLabel, QRadioButton, QCheckBox, QGroupBox, QSpinBox,
     QMessageBox, QFileDialog, QTreeWidget, QTreeWidgetItem, QHeaderView, QDialog,
-    QComboBox, QDateEdit, QAbstractItemView, QCompleter, QFrame
+    QComboBox, QDateEdit, QAbstractItemView, QCompleter, QFrame, QProgressDialog
 )  # PySide6 GUI components | UI widgets dan layouts
 from PySide6.QtCore import (
     Qt, QTimer, Signal, QThread, QDateTime, QDate, QLocale, QMetaObject
@@ -17,6 +17,8 @@ from config import (
 from datetime import datetime  # Date/time operations | Modul untuk date/time
 from ui_export import create_export_dialog  # Import fungsi export dialog | Fungsi untuk membuat export dialog
 import os  # File operations | Modul untuk file operations
+import subprocess  # Untuk membuka folder
+import platform  # Untuk deteksi OS
 
 
 class LogicSignals(QThread):
@@ -58,6 +60,7 @@ class MainWindow(QMainWindow):
     
     export_result_signal = Signal(str)  # Signal untuk export result | Emit hasil export file
     export_status_signal = Signal(str, str)  # Signal untuk export status | Emit status export operation
+    export_progress_signal = Signal(str, str)  # Signal untuk export progress | Emit progress export (message, value)
     file_scan_result_signal = Signal(str)  # Signal untuk file scan result | Emit hasil scan dari file
 
     def __init__(self):
@@ -174,6 +177,7 @@ class MainWindow(QMainWindow):
         self.normal_geometry = None
         self.logic_thread = None  # Instance LogicSignals thread | Akan diisi saat _setup_logic_thread
         self.logic = None  # Instance DetectionLogic | Akan diisi saat _setup_logic_thread
+        self.progress_dialog = None  # Progress dialog untuk export | Akan diisi saat export
         
         # Connect internal signals untuk handling asynchronous operations
         self.export_result_signal.connect(self._handle_export_result)  # Handle hasil export
@@ -534,7 +538,7 @@ class MainWindow(QMainWindow):
         layout.addWidget(self.success_container)
 
         # === Group Box untuk Detection Output (OCR Results) ===
-        all_text_group = QGroupBox("Detection Output:")
+        all_text_group = QGroupBox("Detection Output")
         all_text_group.setFont(QFont("Arial", 9, QFont.Bold))
         all_text_layout = QVBoxLayout(all_text_group)
         all_text_group.setStyleSheet("""
@@ -595,153 +599,155 @@ class MainWindow(QMainWindow):
     
     def _create_statistics_container(self, parent_layout):
         """
-        NEW METHOD: Buat container untuk statistik seperti gambar
+        NEW METHOD: Buat container untuk statistik PERSIS seperti foto statistik.png
         Tujuan: Menampilkan statistik dalam box-box terpisah (Label, Total, OK, NOT OK)
-        Fungsi: Membuat 4 box statistik dengan QGroupBox styling seperti Detection Output
+        Fungsi: Membuat 4 box statistik dengan QGroupBox styling yang sama persis dengan foto
         Parameter: parent_layout - Layout parent dimana container ini akan ditambahkan
         """
-        # Buat widget container utama untuk menampung semua box statistik
-        stats_container = QWidget()
-        stats_layout = QVBoxLayout(stats_container)
-        stats_layout.setContentsMargins(0, 2, 0, 2)  # Margin luar container
-        stats_layout.setSpacing(5)  # Jarak antar box
-
-        # ===== Box 1: Label yang sedang dipilih (TOP BOX) =====
-        # Menggunakan QGroupBox dengan title "Label:" di border atas
-        self.label_box = QGroupBox("LABEL")
-        self.label_box.setFont(QFont("Arial", 9, QFont.Bold))
-        self.label_box.setStyleSheet("""
+        # Buat outer GroupBox dengan title "STATISTIK" seperti di foto
+        outer_stats_box = QGroupBox("STATISTIK")
+        outer_stats_box.setFont(QFont("Arial", 9, QFont.Bold))
+        outer_stats_box.setStyleSheet("""
             QGroupBox {
-                background-color: #F0F0F0;
-                border: 1px solid #aaa;
-                border-radius: 5px;
-                margin-top: 10px;
+                border: 1px solid #333;
+                border-radius: 8px;
+                margin-top: 12px;
+                padding-top: 8px;
             }
             QGroupBox::title {
                 subcontrol-origin: margin;
-                left: 105px;
-                padding: 2px 2px;
+                left: 90px;
+                padding: 5px 5px;
+                color: black;
             }
         """)
-        # Layout untuk konten di dalam label box
-        label_box_layout = QVBoxLayout(self.label_box)
-        label_box_layout.setContentsMargins(8, 12, 8, 8)  # Padding dalam box (12px atas untuk beri ruang title)
+        
+        # Layout utama di dalam outer box
+        stats_layout = QVBoxLayout(outer_stats_box)
+        stats_layout.setContentsMargins(10, 15, 10, 10)
+        stats_layout.setSpacing(8)
 
-        # Label untuk menampilkan nama label yang dipilih
+        # ===== Box 1: LABEL =====
+        self.label_box = QGroupBox("LABEL")
+        self.label_box.setFont(QFont("Arial", 8, QFont.Bold))
+        self.label_box.setStyleSheet("""
+            QGroupBox {
+                border: 1px solid #666;
+                border-radius: 6px;
+                margin-top: 8px;
+                padding-top: 5px;
+            }
+            QGroupBox::title {
+                subcontrol-origin: margin;
+                left: 92px;
+                padding: 2px 3px;
+                color: black;
+            }
+        """)
+        label_box_layout = QVBoxLayout(self.label_box)
+        label_box_layout.setContentsMargins(5, 10, 5, 5)
+
         self.label_display = QLabel(". . .")
         self.label_display.setFont(QFont("Arial", 10, QFont.Bold))
         self.label_display.setAlignment(Qt.AlignCenter)
-        self.label_display.setStyleSheet("border: none; color: #b30800;")
+        self.label_display.setStyleSheet("border: none; color: black;")
         label_box_layout.addWidget(self.label_display)
 
-        # ===== Box 2: Total Deteksi (MIDDLE BOX) =====
-        # Menggunakan QGroupBox dengan title "TOTAL:" di border atas
+        # ===== Box 2: TOTAL =====
         self.total_box = QGroupBox("TOTAL")
-        self.total_box.setFont(QFont("Arial", 9, QFont.Bold))
+        self.total_box.setFont(QFont("Arial", 8, QFont.Bold))
         self.total_box.setStyleSheet("""
             QGroupBox {
-                background-color: #F0F0F0;
-                border: 1px solid #aaa;
-                border-radius: 5px;
-                margin-top: 10px;
+                border: 1px solid #666;
+                border-radius: 6px;
+                margin-top: 8px;
+                padding-top: 5px;
             }
             QGroupBox::title {
                 subcontrol-origin: margin;
-                left: 105px;
-                padding: 2px 2px;
+                left: 92px;
+                padding: 2px 3px;
+                color: black;
             }
         """)
-        # Layout untuk konten di dalam total box
         total_box_layout = QVBoxLayout(self.total_box)
-        total_box_layout.setContentsMargins(8, 12, 8, 8)  # Padding dalam box
+        total_box_layout.setContentsMargins(5, 10, 5, 5)
 
-        # Label untuk menampilkan jumlah total deteksi
         self.total_display = QLabel("0")
         self.total_display.setFont(QFont("Arial", 10, QFont.Bold))
         self.total_display.setAlignment(Qt.AlignCenter)
         self.total_display.setStyleSheet("border: none; color: blue;")
         total_box_layout.addWidget(self.total_display)
 
-        # ===== Box 3 & 4: OK dan NOT OK (BOTTOM ROW dengan 2 BOX) =====
-        # Buat widget container untuk row bawah (menampung 2 box berdampingan)
+        # ===== Box 3 & 4: OK dan NOT OK (BOTTOM ROW) =====
         bottom_row = QWidget()
         bottom_layout = QHBoxLayout(bottom_row)
-        bottom_layout.setContentsMargins(0, 0, 0, 0)  # Hapus margin
-        bottom_layout.setSpacing(5)  # Jarak antara box OK dan NOT OK
+        bottom_layout.setContentsMargins(0, 0, 0, 0)
+        bottom_layout.setSpacing(8)
 
-        # ===== Box OK (LEFT) =====
-        # Menggunakan QGroupBox dengan title "OK:" di border atas
+        # Box OK
         self.ok_box = QGroupBox("OK")
-        self.ok_box.setFont(QFont("Arial", 9, QFont.Bold))
+        self.ok_box.setFont(QFont("Arial", 8, QFont.Bold))
         self.ok_box.setStyleSheet("""
             QGroupBox {
-                background-color: #F0F0F0;
-                border: 1px solid #aaa;
-                border-radius: 5px;
-                margin-top: 10px;
+                border: 1px solid #666;
+                border-radius: 6px;
+                margin-top: 8px;
+                padding-top: 5px;
             }
             QGroupBox::title {
                 subcontrol-origin: margin;
-                left: 50px;
-                padding: 2px 2px;
+                left: 42px;
+                padding: 2px 3px;
+                color: black;
             }
         """)
-        # Layout untuk konten di dalam OK box
         ok_box_layout = QVBoxLayout(self.ok_box)
-        ok_box_layout.setContentsMargins(8, 12, 8, 8)  # Padding dalam box
+        ok_box_layout.setContentsMargins(5, 10, 5, 5)
 
-        # Label untuk menampilkan jumlah deteksi OK
         self.ok_display = QLabel("0")
         self.ok_display.setFont(QFont("Arial", 10, QFont.Bold))
         self.ok_display.setAlignment(Qt.AlignCenter)
         self.ok_display.setStyleSheet("border: none; color: blue;")
         ok_box_layout.addWidget(self.ok_display)
 
-        # ===== Box NOT OK (RIGHT) =====
-        # Menggunakan QGroupBox dengan title "NOT OK:" di border atas
+        # Box NOT OK
         self.not_ok_box = QGroupBox("NOT OK")
-        self.not_ok_box.setFont(QFont("Arial", 9, QFont.Bold))
+        self.not_ok_box.setFont(QFont("Arial", 8, QFont.Bold))
         self.not_ok_box.setStyleSheet("""
             QGroupBox {
-                background-color: #F0F0F0;
-                border: 1px solid #aaa;
-                border-radius: 5px;
-                margin-top: 10px;
+                border: 1px solid #666;
+                border-radius: 6px;
+                margin-top: 8px;
+                padding-top: 5px;
             }
             QGroupBox::title {
                 subcontrol-origin: margin;
-                left: 35px;
-                padding: 2px 2px;
+                left: 30px;
+                padding: 2px 3px;
+                color: black;
             }
         """)
-        # Layout untuk konten di dalam NOT OK box
         not_ok_box_layout = QVBoxLayout(self.not_ok_box)
-        not_ok_box_layout.setContentsMargins(8, 12, 8, 8)  # Padding dalam box
+        not_ok_box_layout.setContentsMargins(5, 10, 5, 5)
 
-        # Label untuk menampilkan jumlah deteksi NOT OK
         self.not_ok_display = QLabel("0")
         self.not_ok_display.setFont(QFont("Arial", 10, QFont.Bold))
         self.not_ok_display.setAlignment(Qt.AlignCenter)
         self.not_ok_display.setStyleSheet("border: none; color: blue;")
         not_ok_box_layout.addWidget(self.not_ok_display)
 
-        # Tambahkan box OK dan NOT OK ke bottom row (horizontal)
+        # Tambahkan OK dan NOT OK ke bottom row
         bottom_layout.addWidget(self.ok_box)
         bottom_layout.addWidget(self.not_ok_box)
 
-        # Tambahkan semua box ke stats container (vertical)
-        # Urutan dari atas ke bawah: Label -> Total -> (OK | NOT OK)
+        # Tambahkan semua ke stats layout
         stats_layout.addWidget(self.label_box)
         stats_layout.addWidget(self.total_box)
         stats_layout.addWidget(bottom_row)
 
-        # Tambahkan stats container ke parent layout (main control panel)
-        parent_layout.addWidget(stats_container)
-
-
-# ========== PERUBAHAN 4: TAMBAH Method Baru update_statistics_display() ==========
-# LOKASI: Tambahkan method ini SETELAH _create_statistics_container()
-
+        # Tambahkan outer box ke parent layout
+        parent_layout.addWidget(outer_stats_box)
     def update_statistics_display(self, label_text, total_count, ok_count, not_ok_count):
         """
         Update tampilan statistik di container boxes
@@ -812,8 +818,6 @@ class MainWindow(QMainWindow):
                 self.logic.set_target_label(text)
 
         self.update_code_display()
-
-
 
     def _create_right_panel(self):
         #Fungsi buat panel kanan
@@ -1392,6 +1396,28 @@ class MainWindow(QMainWindow):
 
                 dialog.accept()
 
+                # Buat progress dialog
+                self.progress_dialog = QProgressDialog("Memulai export...", "Batal", 0, 100, self)
+                self.progress_dialog.setWindowTitle("Export Data")
+                self.progress_dialog.setWindowModality(Qt.WindowModal)
+                self.progress_dialog.setMinimumDuration(0)  # Tampilkan langsung
+                self.progress_dialog.setValue(0)
+                self.progress_dialog.setAutoClose(False)  # Jangan auto close
+                self.progress_dialog.setAutoReset(False)
+                
+                # Connect signal untuk update progress - GUNAKAN SIGNAL BARU
+                def update_progress_dialog(message, value):
+                    if self.progress_dialog:
+                        try:
+                            self.progress_dialog.setLabelText(message)
+                            self.progress_dialog.setValue(int(value))
+                        except:
+                            pass
+                
+                self.export_progress_signal.connect(update_progress_dialog)
+                
+                self.progress_dialog.show()
+
                 # Start export in background thread
                 threading.Thread(
                     target=self._execute_export_thread, 
@@ -1432,7 +1458,12 @@ class MainWindow(QMainWindow):
              self.export_result_signal.emit("EXPORT_ERROR: Logic Object not found")
              return
         
-        result = execute_export(sql_filter, date_range_desc, export_label, current_preset)
+        # Callback function untuk update progress - GUNAKAN SIGNAL PROGRESS YANG BARU
+        def progress_callback(current, total, message):
+            # Emit signal untuk update progress dialog
+            self.export_progress_signal.emit(message, f"{current}")
+        
+        result = execute_export(sql_filter, date_range_desc, export_label, current_preset, progress_callback)
         
         self.export_result_signal.emit(result)
 
@@ -1441,6 +1472,17 @@ class MainWindow(QMainWindow):
         self.btn_export.setText("EXPORT DATA")
         self.btn_export.setStyleSheet(self.BUTTON_STYLES['primary'])
         
+        # Tutup progress dialog jika masih terbuka
+        if hasattr(self, 'progress_dialog') and self.progress_dialog:
+            self.progress_dialog.close()
+            self.progress_dialog = None
+        
+        # Disconnect signal progress untuk cleanup
+        try:
+            self.export_progress_signal.disconnect()
+        except:
+            pass  # Ignore jika tidak ada connection
+        
         if result == "NO_DATA":
             QMessageBox.information(self, "Info", "Tidak ada data !")
             self._update_export_button_ui("Export Gagal!", "danger")
@@ -1448,8 +1490,47 @@ class MainWindow(QMainWindow):
             QMessageBox.critical(self, "Error Export", f"Gagal mengekspor data ke Excel:\n{result[13:]}")
             self._update_export_button_ui("Export Gagal!", "danger")
         else:
-            QMessageBox.information(self, "Sukses", f"Data berhasil diekspor ke:\n{result}")
+            # Export berhasil - tampilkan custom dialog dengan button open folder
+            self._show_export_success_dialog(result)
             self._update_export_button_ui("Export Berhasil!", "success")
+    
+    def _show_export_success_dialog(self, filepath):
+        """Tampilkan dialog sukses export dengan button untuk membuka folder."""
+        msg_box = QMessageBox(self)
+        msg_box.setWindowTitle("Export Berhasil")
+        msg_box.setIcon(QMessageBox.Information)
+        msg_box.setText(f"Data berhasil diekspor ke:\n{filepath}")
+        
+        # Tambah button untuk open folder
+        open_folder_btn = msg_box.addButton("Open Folder", QMessageBox.ActionRole)
+        ok_btn = msg_box.addButton(QMessageBox.Ok)
+        
+        msg_box.exec()
+        
+        # Cek button mana yang diklik
+        if msg_box.clickedButton() == open_folder_btn:
+            self._open_file_location(filepath)
+    
+    def _open_file_location(self, filepath):
+        """Buka folder tempat file berada di file explorer."""
+        try:
+            folder_path = os.path.dirname(os.path.abspath(filepath))
+            
+            # Deteksi OS dan gunakan command yang sesuai
+            system = platform.system()
+            
+            if system == "Windows":
+                # Windows: gunakan explorer dengan /select untuk highlight file
+                subprocess.run(['explorer', '/select,', os.path.abspath(filepath)])
+            elif system == "Darwin":  # macOS
+                # macOS: gunakan open dengan -R untuk reveal in Finder
+                subprocess.run(['open', '-R', filepath])
+            else:  # Linux dan OS lainnya
+                # Linux: buka folder (tidak bisa highlight file spesifik di semua file manager)
+                subprocess.run(['xdg-open', folder_path])
+                
+        except Exception as e:
+            QMessageBox.warning(self, "Warning", f"Tidak dapat membuka folder:\n{e}")
             
     def _update_export_button_ui(self, text, style_type):
         #Update styling dan teks export button untuk menunjukkan status.
