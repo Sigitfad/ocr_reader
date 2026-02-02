@@ -107,8 +107,8 @@ class DetectionLogic(threading.Thread):
     def run(self):
         # Method utama thread yang akan dijalankan saat start()
         # Tujuan: Capture frame dari camera secara continuous dan trigger OCR scan
-        # Cari external camera (prioritas eksternal, fallback ke built-in)
-        self.current_camera_index = find_external_camera(MAX_CAMERAS)
+        # UPDATED: Gunakan camera index yang sudah dipilih user (tidak auto-detect lagi)
+        # current_camera_index sudah di-set dari UI sebelum start()
         
         # Buka camera dengan DirectShow backend (Windows)
         # DirectShow biasanya lebih reliable untuk Windows
@@ -135,9 +135,8 @@ class DetectionLogic(threading.Thread):
         self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, CAMERA_HEIGHT)
         self.cap.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc(*'MJPG'))  # MJPEG codec
         
-        # Buat info string untuk display (External/Internal camera)
-        camera_info = f"Camera: {self.current_camera_index} ({'External' if self.current_camera_index != 0 else 'Internal'})"
-        self.camera_status_signal.emit(camera_info, True)
+        # Emit signal bahwa camera sudah aktif
+        self.camera_status_signal.emit("Camera Running", True)
 
         # Main loop: capture frame selama running=True
         while self.running:

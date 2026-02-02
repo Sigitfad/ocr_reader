@@ -15,6 +15,7 @@ from config import (
     JIS_TYPES, DIN_TYPES, MONTHS, MONTH_MAP
 )  # Import konfigurasi dari config.py
 from datetime import datetime  # Date/time operations | Modul untuk date/time
+from ui_setting import create_setting_dialog  # Import fungsi setting dialog | Fungsi untuk membuat setting dialog
 from ui_export import create_export_dialog  # Import fungsi export dialog | Fungsi untuk membuat export dialog
 import os  # File operations | Modul untuk file operations
 import subprocess  # Untuk membuka folder
@@ -178,6 +179,8 @@ class MainWindow(QMainWindow):
         self.logic_thread = None  # Instance LogicSignals thread | Akan diisi saat _setup_logic_thread
         self.logic = None  # Instance DetectionLogic | Akan diisi saat _setup_logic_thread
         self.progress_dialog = None  # Progress dialog untuk export | Akan diisi saat export
+        self.available_cameras = []  # List kamera yang tersedia | Akan diisi saat populate camera list
+        self._prev_camera_index = 0  # Index kamera sebelumnya untuk tracking changes
         
         # Connect internal signals untuk handling asynchronous operations
         self.export_result_signal.connect(self._handle_export_result)  # Handle hasil export
@@ -219,6 +222,13 @@ class MainWindow(QMainWindow):
         # Buat instance baru
         self.logic_thread = LogicSignals()  # Buat thread wrapper baru
         self.logic = self.logic_thread.logic  # Ambil reference ke DetectionLogic instance
+        
+        # Set camera index yang dipilih user (atau default)
+        if hasattr(self, 'camera_combo'):
+            # Jika camera combo sudah ada (bukan initial setup)
+            camera_index = self.camera_combo.currentData()
+            if camera_index is not None:
+                self.logic.current_camera_index = camera_index
         
         # Connect semua signals ke handler functions
         self.logic_thread.update_signal.connect(self.update_video_frame)  # Update frame kamera
@@ -360,210 +370,153 @@ class MainWindow(QMainWindow):
 
     def _create_control_panel(self):
         """
-        Fungsi buat panel kontrol
-        Tujuan: Create left control panel dengan buttons dan combos
-        Fungsi: Membuat semua UI controls (preset, options, label selector, buttons)
+        Fungsi buat panel kontrol - LAYOUT BARU sesuai panelkiri.PNG
+        Tujuan: Create left control panel dengan SETTING button dan controls yang disederhanakan
+        Fungsi: Membuat panel kiri dengan: SETTING button, Options, START/STOP, SCAN FROM FILE, Detection Output, Statistics
         Return: QWidget - Widget panel kontrol yang sudah lengkap
         """
         frame = QWidget()
         layout = QVBoxLayout(frame)
         layout.setContentsMargins(15, 15, 15, 15)
-
-        # === Top Control Widget (Preset dan Options) ===
-        top_control_widget = QWidget()
-        top_control_layout = QHBoxLayout(top_control_widget)
-        top_control_layout.setContentsMargins(0, 0, 0, 0)
-
-        # === Group Box untuk Preset Selection ===
-        preset_group = QGroupBox("Tipe")
-        preset_group.setFont(QFont("Arial", 10, QFont.Bold))
-        preset_layout = QVBoxLayout(preset_group)
-        preset_layout.setAlignment(Qt.AlignTop)
-        preset_layout.setContentsMargins(8, 12, 8, 8)
-        preset_layout.setSpacing(6)
-        preset_group.setStyleSheet("""
-            QGroupBox {
-                background-color: #F0F0F0;
-                border: 1px solid #aaa;
-                border-radius: 5px;
-                margin-top: 10px;
-            }
-            QGroupBox::title {
-                subcontrol-origin: margin;
-                left: 45px;
-                padding: 2px 0px;
-            }
-        """)
-
+        layout.setSpacing(10)
+        
+        # === Hidden camera, preset, label combos (untuk dialog SETTING) ===
+        # Tetap buat combo boxes tapi hidden, karena referensi masih diperlukan di logic
+        self.camera_combo = QComboBox()
+        self._populate_camera_list()
+        self.camera_combo.currentIndexChanged.connect(self._on_camera_selection_changed)
+        self.camera_combo.hide()  # Hidden - akan diakses via dialog SETTING
+        
         self.preset_combo = QComboBox()
         self.preset_combo.addItems(["JIS", "DIN"])
         self.preset_combo.setCurrentIndex(0)
-
-        preset_layout.addWidget(self.preset_combo)
-        preset_layout.addStretch()
-
-        set_options = lambda: self.logic.set_camera_options(
-            self.preset_combo.currentText(),
-            False,
-            False,
-            self.cb_edge.isChecked(),
-            self.cb_split.isChecked(),
-            2.0
-        ) if self.logic else None
-
-        self.preset_combo.currentTextChanged.connect(set_options)
-        self.preset_combo.currentTextChanged.connect(self._update_label_options)
-        top_control_layout.addWidget(preset_group)
-
-        # === Group Box untuk Options ===
-        options_group = QGroupBox("Option")
-        options_group.setFont(QFont("Arial", 10, QFont.Bold))
-        options_layout = QVBoxLayout(options_group)
-        options_group.setStyleSheet("""
-            QGroupBox {
-                background-color: #F0F0F0;
-                border: 1px solid #aaa;
-                border-radius: 5px;
-                margin-top: 10px;
-            }
-            QGroupBox::title {
-                subcontrol-origin: margin;
-                left: 40px;
-                padding: 2px 0px;
-            }
-        """)
-
-        self.cb_edge = QCheckBox("BINARY COLOR")
-        self.cb_split = QCheckBox("SPLIT SCREEN")
-
-        option_change = set_options
-
-        self.cb_edge.toggled.connect(option_change)
-        self.cb_split.toggled.connect(option_change)
-
-        options_layout.addWidget(self.cb_edge)
-        options_layout.addWidget(self.cb_split)
-        top_control_layout.addWidget(options_group)
-
-        layout.addWidget(top_control_widget)
-
-        # === Camera Status Label ===
-        self.camera_label = QLabel("Camera: Not Selected")
-        self.camera_label.setFont(QFont("Arial", 9))
-        self.camera_label.setAlignment(Qt.AlignLeft)  # Center alignment
-        self.camera_label.setMinimumHeight(30)  # Tinggi minimum untuk label
-        self.camera_label.setStyleSheet("""
-            QLabel {
-                color: #0066CC;
-                border: 1px solid #aaa;
-                border-radius: 5px;
-                padding: 5px;
-            }
-        """)
-        layout.addWidget(self.camera_label)
-
-        # === Label Selection dengan GroupBox ===
-        # Buat GroupBox dengan border dan title "Select Label :"
-        label_selection_group = QGroupBox("Select Label")
-        label_selection_group.setFont(QFont("Arial", 9, QFont.Bold))
-        label_selection_group.setStyleSheet("""
-            QGroupBox {
-                border: 1px solid #aaa;
-                border-radius: 5px;
-                margin-top: 8px;
-                padding-top: 10px;
-            }
-            QGroupBox::title {
-                subcontrol-origin: margin;
-                left: 85px;
-                padding: 2 3px;
-                color: #000000;
-            }
-        """)
+        self.preset_combo.hide()  # Hidden - akan diakses via dialog SETTING
         
-        # Layout untuk isi GroupBox
-        label_group_layout = QVBoxLayout(label_selection_group)
-        label_group_layout.setContentsMargins(8, 5, 8, 8)
-        label_group_layout.setSpacing(3)
-        
-        # ComboBox untuk pilih label
         self.jis_type_combo = QComboBox()
         self.jis_type_combo.addItems(JIS_TYPES)
         self.jis_type_combo.setEditable(True)
         self.jis_type_combo.setInsertPolicy(QComboBox.InsertPolicy.NoInsert)
         self.jis_type_combo.setCompleter(QCompleter(self.jis_type_combo.model()))
         self.jis_type_combo.currentTextChanged.connect(self.on_jis_type_changed)
-        self.jis_type_combo.setMinimumHeight(35)
-        self.jis_type_combo.setStyleSheet("""
-            QComboBox {
-                border: 1px solid #ccc;
-                border-radius: 3px;
-                padding: 5px 8px;
+        self.jis_type_combo.hide()  # Hidden - akan diakses via dialog SETTING
+        
+        # Connect signals untuk hidden combos
+        set_options = lambda: self.logic.set_camera_options(
+            self.preset_combo.currentText(),
+            False,
+            False,
+            self.cb_edge.isChecked() if hasattr(self, 'cb_edge') else False,
+            self.cb_split.isChecked() if hasattr(self, 'cb_split') else False,
+            2.0
+        ) if self.logic else None
+        
+        self.preset_combo.currentTextChanged.connect(set_options)
+        self.preset_combo.currentTextChanged.connect(self._update_label_options)
+        
+        # === SETTING BUTTON (BIRU) - membuka dialog setting ===
+        self.btn_setting = QPushButton("SETTING")
+        self.btn_setting.setStyleSheet("""
+            QPushButton {
+                background-color: #0000FF;
+                color: white;
+                font-weight: bold;
                 font-size: 13px;
-                background-color: white;
+                border-radius: 4px;
+                padding: 8px 12px;
+                min-height: 32px;
+            }
+            QPushButton:hover {
+                background-color: #0000DD;
+            }
+            QPushButton:pressed {
+                background-color: #0000BB;
             }
         """)
-        label_group_layout.addWidget(self.jis_type_combo)
+        self.btn_setting.clicked.connect(self.open_setting_dialog)
+        layout.addWidget(self.btn_setting)
         
-        # Label warning "Pilih Label Terlebih Dahulu" dengan warna orange
-        self.selected_type_label = QLabel("Pilih Label Terlebih Dahulu")
-        self.selected_type_label.setFont(QFont("Arial", 9))
-        self.selected_type_label.setStyleSheet("color: #FF6600; font-weight: normal; border: none;")
-        self.selected_type_label.setAlignment(Qt.AlignCenter)
-        self.selected_type_label.setWordWrap(True)
-        label_group_layout.addWidget(self.selected_type_label)
+        # === Group Box untuk Options ===
+        options_group = QGroupBox("Option")
+        options_group.setFont(QFont("Arial", 10, QFont.Bold))
+        options_layout = QVBoxLayout(options_group)
+        options_layout.setContentsMargins(10, 15, 10, 10)
+        options_layout.setSpacing(8)
+        options_group.setStyleSheet("""
+            QGroupBox {
+                border: 1px solid #666;
+                border-radius: 6px;
+                margin-top: 8px;
+                padding-top: 8px;
+            }
+            QGroupBox::title {
+                subcontrol-origin: margin;
+                left: 100px;
+                padding: 2px 5px;
+                color: black;
+            }
+        """)
         
-        # Tambahkan GroupBox ke layout utama
-        layout.addWidget(label_selection_group)
-
-        # === Camera Control Button (START/STOP Toggle) ===
-        # MODIFIED: Menggabungkan tombol START dan STOP menjadi satu tombol toggle dengan Bootstrap style
+        self.cb_edge = QCheckBox("BINARY COLOR")
+        self.cb_edge.setFont(QFont("Arial", 10))
+        self.cb_split = QCheckBox("SPLIT SCREEN")
+        self.cb_split.setFont(QFont("Arial", 10))
+        
+        option_change = set_options
+        self.cb_edge.toggled.connect(option_change)
+        self.cb_split.toggled.connect(option_change)
+        
+        options_layout.addWidget(self.cb_edge)
+        options_layout.addWidget(self.cb_split)
+        layout.addWidget(options_group)
+        
+        # === Camera Control Button (START - HIJAU) ===
         self.btn_camera_toggle = QPushButton("START")
         self.btn_camera_toggle.setStyleSheet(self.BUTTON_STYLES['success'])
         self.btn_camera_toggle.clicked.connect(self.toggle_camera)
-        self.is_camera_running = False  # Flag untuk tracking status kamera
-        
+        self.is_camera_running = False
         layout.addWidget(self.btn_camera_toggle)
-
-        # === Button untuk Scan dari File ===
+        
+        # === Button untuk Scan dari File (BIRU) ===
         self.btn_file = QPushButton("SCAN FROM FILE")
         self.btn_file.setStyleSheet(self.BUTTON_STYLES['primary'])
         self.btn_file.clicked.connect(self.open_file_scan_dialog)
         layout.addWidget(self.btn_file)
-
+        
         # === Container untuk Success Popup ===
         self.success_container = QWidget()
         self.success_layout = QVBoxLayout(self.success_container)
         self.success_container.setFixedHeight(50)
         layout.addWidget(self.success_container)
-
-        # === Group Box untuk Detection Output (OCR Results) ===
+        
+        # === Group Box untuk Detection Output ===
         all_text_group = QGroupBox("Detection Output")
         all_text_group.setFont(QFont("Arial", 9, QFont.Bold))
         all_text_layout = QVBoxLayout(all_text_group)
+        all_text_layout.setContentsMargins(10, 12, 10, 10)
         all_text_group.setStyleSheet("""
             QGroupBox {
-                background-color: #F0F0F0;
-                border: 1px solid #aaa;
-                border-radius: 5px;
-                margin-top: 12px;
+                border: 1px solid #666;
+                border-radius: 6px;
+                margin-top: 8px;
                 padding-top: 8px;
             }
             QGroupBox::title {
                 subcontrol-origin: margin;
-                left: 70px;
-                padding: 5px 3px;
+                left: 65px;
+                padding: 5px 5px;
+                color: black;
             }
         """)
-
+        
         self.all_text_tree = QTreeWidget()
         self.all_text_tree.setHeaderLabels(["Element Text"])
         self.all_text_tree.header().setVisible(False)
         self.all_text_tree.setStyleSheet("""
             QTreeWidget {
                 font-size: 9pt;
-                background-color: #f9f9f9;
-                border: 1px solid #ddd;
+                background-color: white;
+                border: 1px solid #ccc;
+                border-radius: 3px;
             }
             QScrollBar:vertical {
                 border: none;
@@ -588,14 +541,36 @@ class MainWindow(QMainWindow):
         """)
         self.all_text_tree.setMinimumHeight(50)
         all_text_layout.addWidget(self.all_text_tree)
-
         layout.addWidget(all_text_group, 2)
-
-        # --- DIPINDAHKAN KE SINI ---
-        # Container statistik sekarang berada di paling bawah panel kiri
+        
+        # === Container Statistik di paling bawah ===
         self._create_statistics_container(layout)
-
+        
+        # Hidden label untuk backward compatibility - tetap ada tapi tidak visible di UI
+        # Masih diperlukan oleh update_code_display() untuk update text
+        self.selected_type_label = QLabel("Pilih Label Terlebih Dahulu")
+        self.selected_type_label.setFont(QFont("Arial", 9))
+        self.selected_type_label.setStyleSheet("color: #FF6600; font-weight: normal; border: none;")
+        self.selected_type_label.setAlignment(Qt.AlignCenter)
+        self.selected_type_label.hide()  # Hidden dari UI tapi tetap ada untuk logic
+        
         return frame
+    
+    def open_setting_dialog(self):
+        """
+        Fungsi untuk membuka dialog SETTING
+        Tujuan: Menampilkan dialog pengaturan camera, tipe, dan label
+        """
+        dialog = create_setting_dialog(
+            self, 
+            self.camera_combo, 
+            self.preset_combo, 
+            self.jis_type_combo,
+            self.available_cameras
+        )
+        
+        if dialog:
+            dialog.exec()
     
     def _create_statistics_container(self, parent_layout):
         """
@@ -782,7 +757,7 @@ class MainWindow(QMainWindow):
         Return: bool - True jika valid, False jika tidak valid
         """
         # Jika label kosong atau placeholder, return False
-        if not label_text or label_text.strip() == "" or label_text == "Select Label . . .":
+        if not label_text or label_text.strip() == "" or label_text == "Select Label...":
             return False
         
         # Check berdasarkan preset aktif
@@ -1080,8 +1055,10 @@ class MainWindow(QMainWindow):
         self._hide_success_popup()
 
     def update_camera_status(self, status_text, is_running):
-        #Update status kamera.
-        self.camera_label.setText(status_text)
+        #Update status kamera dan enable/disable camera combo.
+        # Disable camera combo saat kamera running untuk prevent switching
+        self.camera_combo.setEnabled(not is_running)
+        
         if not is_running:
             self.video_label.setText("CAMERA STOP")
 
@@ -1122,7 +1099,7 @@ class MainWindow(QMainWindow):
         self.code_tree.clear()
         
         selected_session = self.jis_type_combo.currentText()
-        show_nothing = (selected_session == "Select Label . . ." or not selected_session.strip())
+        show_nothing = (selected_session == "Select Label..." or not selected_session.strip())
         
         if show_nothing:
             self.selected_type_label.setText("Pilih Label Terlebih Dahulu")
@@ -1542,6 +1519,74 @@ class MainWindow(QMainWindow):
         #Reset export button ke kondisi default.
         self.btn_export.setText("EXPORT DATA")
         self.btn_export.setStyleSheet(self.BUTTON_STYLES['primary'])
+
+    def _populate_camera_list(self):
+        """
+        Fungsi untuk mengisi dropdown camera dengan kamera yang tersedia
+        Tujuan: Deteksi dan tampilkan semua kamera yang terhubung ke sistem
+        """
+        from utils import get_available_cameras
+        from config import MAX_CAMERAS
+        
+        # Clear existing items
+        self.camera_combo.clear()
+        
+        # Get list of available cameras
+        self.available_cameras = get_available_cameras(MAX_CAMERAS)
+        
+        if len(self.available_cameras) == 0:
+            # Tidak ada kamera terdeteksi
+            self.camera_combo.addItem("No Camera Detected")
+            self.camera_combo.setEnabled(False)
+        else:
+            # Ada kamera terdeteksi - tambahkan ke dropdown
+            for cam in self.available_cameras:
+                self.camera_combo.addItem(cam['name'], cam['index'])
+            
+            # Set ke kamera eksternal jika ada, jika tidak ke internal
+            external_index = -1
+            for i, cam in enumerate(self.available_cameras):
+                if cam['index'] > 0:
+                    external_index = i
+                    break
+            
+            if external_index >= 0:
+                self.camera_combo.setCurrentIndex(external_index)
+            else:
+                self.camera_combo.setCurrentIndex(0)
+            
+            self.camera_combo.setEnabled(True)
+    
+    def _on_camera_selection_changed(self, index):
+        """
+        Fungsi handler saat user memilih kamera berbeda dari dropdown
+        Tujuan: Update selected camera di detection logic
+        Parameter: index - index item yang dipilih di combobox
+        """
+        if index < 0 or not self.available_cameras:
+            return
+        
+        # Cegah perubahan kamera saat deteksi sedang berjalan
+        if self.logic and self.logic.running:
+            QMessageBox.warning(
+                self,
+                "Warning",
+                "Tidak dapat mengganti kamera saat deteksi sedang berjalan!\nHarap STOP kamera terlebih dahulu."
+            )
+            # Kembalikan ke pilihan sebelumnya
+            prev_index = getattr(self, '_prev_camera_index', 0)
+            self.camera_combo.blockSignals(True)
+            self.camera_combo.setCurrentIndex(prev_index)
+            self.camera_combo.blockSignals(False)
+            return
+        
+        # Update selected camera index di logic
+        camera_index = self.camera_combo.currentData()
+        if self.logic and camera_index is not None:
+            self.logic.current_camera_index = camera_index
+        
+        # Simpan index saat ini untuk reference
+        self._prev_camera_index = index
 
     def _update_label_options(self, preset):
         #Update daftar label/type sesuai preset yang dipilih.

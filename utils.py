@@ -290,6 +290,182 @@ def convert_frame_to_binary(frame):
     # Return: frame dengan background hitam dan garis putih neon
     return apply_edge_detection(frame)
 
+def get_camera_name(index):
+    """
+    Fungsi untuk mendapatkan nama device kamera yang sebenarnya
+    Tujuan: Mendapatkan nama kamera seperti "Logitech C920" bukan hanya "Camera 1"
+    Parameter: index (int) - index kamera yang ingin dicek
+    Return: string nama kamera atau None jika tidak bisa dideteksi
+    
+    Support multi-platform:
+    - Windows: menggunakan pygrabber atau WMI
+    - Linux: membaca dari /sys/class/video4linux/
+    - macOS: menggunakan system_profiler
+    """
+    import platform
+    system = platform.system()
+    
+    try:
+        if system == "Windows":
+            # === WINDOWS: Gunakan WMI (Windows Management Instrumentation) ===
+            try:
+                import subprocess
+                # Gunakan PowerShell untuk query WMI
+                cmd = 'powershell "Get-WmiObject Win32_PnPEntity | Where-Object {$_.Caption -match \'camera|webcam\'} | Select-Object Caption"'
+                result = subprocess.check_output(cmd, shell=True, timeout=3).decode('utf-8', errors='ignore')
+                
+                # Parse hasil untuk mendapatkan daftar kamera
+                cameras = []
+                for line in result.split('\n'):
+                    line = line.strip()
+                    if line and not line.startswith('-') and line != 'Caption':
+                        cameras.append(line)
+                
+                # Return kamera sesuai index jika ada
+                if 0 <= index < len(cameras):
+                    return cameras[index]
+            except:
+                # Fallback: gunakan registry atau device manager
+                try:
+                    import winreg
+                    # Coba baca dari registry
+                    key_path = r"SOFTWARE\Microsoft\Windows\CurrentVersion\MMDevices\Audio\Capture"
+                    # Ini hanya contoh, untuk video devices path berbeda
+                    # Fallback ke None jika gagal
+                    pass
+                except:
+                    pass
+        
+        elif system == "Linux":
+            # === LINUX: Baca dari /sys/class/video4linux/ ===
+            try:
+                device_path = f"/sys/class/video4linux/video{index}/name"
+                if os.path.exists(device_path):
+                    with open(device_path, 'r') as f:
+                        name = f.read().strip()
+                        if name:
+                            return name
+                
+                # Alternative: gunakan v4l2-ctl jika tersedia
+                import subprocess
+                result = subprocess.check_output(
+                    ['v4l2-ctl', '--list-devices'], 
+                    stderr=subprocess.DEVNULL,
+                    timeout=2
+                ).decode('utf-8')
+                
+                # Parse output untuk mendapatkan nama device
+                current_name = None
+                for line in result.split('\n'):
+                    line = line.strip()
+                    if line and not line.startswith('/dev/'):
+                        current_name = line.rstrip(':')
+                    elif f'/dev/video{index}' in line and current_name:
+                        return current_name
+            except:
+                pass
+        
+        elif system == "Darwin":  # macOS
+            # === macOS: Gunakan system_profiler ===
+            try:
+                import subprocess
+                result = subprocess.check_output(
+                    ['system_profiler', 'SPCameraDataType'],
+                    timeout=3
+                ).decode('utf-8')
+                
+                # Parse hasil untuk mendapatkan daftar kamera
+                cameras = []
+                for line in result.split('\n'):
+                    line = line.strip()
+                    if ':' in line and 'Camera' not in line:
+                        # Nama kamera biasanya di awal baris dengan format "Name:"
+                        parts = line.split(':')
+                        if len(parts) == 2 and parts[1].strip():
+                            cameras.append(parts[0].strip())
+                
+                # Return kamera sesuai index jika ada
+                if 0 <= index < len(cameras):
+                    return cameras[index]
+            except:
+                pass
+    
+    except Exception as e:
+        # Silent fail untuk semua error
+        pass
+    
+    # Return None jika tidak bisa mendapatkan nama
+    return None
+
+
+def get_available_cameras(max_cameras=5):
+    """
+    Fungsi untuk mendapatkan list semua kamera yang tersedia
+    Tujuan: Deteksi semua kamera yang terhubung ke sistem untuk ditampilkan di dropdown
+    Parameter: max_cameras (int) - maksimal jumlah kamera yang akan di-scan
+    Return: list of dict dengan format [{'index': 0, 'name': 'Logitech C920 - 1920x1080', 'width': 1920, 'height': 1080}, ...]
+    """
+    available_cameras = []
+    
+    # Loop cek semua kamera dari index 0 hingga max_cameras-1
+    for i in range(max_cameras):
+        cap = None
+        try:
+            # Coba buka kamera pada index i dengan backend default
+            cap = cv2.VideoCapture(i, cv2.CAP_ANY)
+            
+            # Timeout untuk mencegah hang
+            cap.set(cv2.CAP_PROP_OPEN_TIMEOUT_MSEC, 1000)  # 1 detik timeout
+            
+            # Cek apakah kamera berhasil dibuka
+            if cap.isOpened():
+                # Coba baca 1 frame untuk validasi
+                ret, test_frame = cap.read()
+                
+                if ret and test_frame is not None:
+                    # Ambil resolusi kamera
+                    w = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+                    h = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+                    
+                    # Validasi resolusi valid
+                    if w > 0 and h > 0:
+                        # Coba dapatkan nama device yang sebenarnya
+                        device_name = get_camera_name(i)
+                        
+                        # Buat nama kamera untuk ditampilkan
+                        if device_name:
+                            # Jika berhasil dapat nama device
+                            camera_name = f"{device_name} - {w}x{h}"
+                        else:
+                            # Fallback ke format lama jika tidak bisa dapat nama
+                            if i == 0:
+                                camera_name = f"Camera {i} (Internal) - {w}x{h}"
+                            else:
+                                camera_name = f"Camera {i} (External) - {w}x{h}"
+                        
+                        # Tambahkan ke list
+                        available_cameras.append({
+                            'index': i,
+                            'name': camera_name,
+                            'width': w,
+                            'height': h,
+                            'device_name': device_name  # Simpan juga nama device asli
+                        })
+        
+        except Exception as e:
+            # Abaikan error dan lanjut ke kamera berikutnya
+            pass
+        
+        finally:
+            # Pastikan kamera ditutup
+            if cap is not None:
+                try:
+                    cap.release()
+                except:
+                    pass
+    
+    return available_cameras
+
 def find_external_camera(max_cameras=5):
     # Fungsi untuk mencari kamera eksternal (bukan built-in laptop)
     # Scan hingga max_cameras perangkat untuk menemukan kamera terbaik
