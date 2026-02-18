@@ -50,25 +50,14 @@ def create_setting_dialog(parent, camera_combo, preset_combo, jis_type_combo, av
         }
     """
     
-    # Style untuk ComboBox - seperti original dengan border dan background putih
+    # Style untuk ComboBox - SAMA DENGAN ui_export.py
     combo_style = """
         QComboBox {
             border: 1px solid #ccc;
             border-radius: 3px;
-            padding: 4px 6px;
-            min-height: 26px;
+            padding: 3px 6px;
+            min-height: 22px;
             font-size: 12px;
-            background-color: white;
-        }
-        QComboBox:hover {
-            border: 1px solid #999;
-        }
-        QComboBox:focus {
-            border: 1px solid #007bff;
-        }
-        QComboBox::drop-down {
-            border: none;
-            width: 20px;
         }
     """
     

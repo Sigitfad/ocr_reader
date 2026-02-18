@@ -436,7 +436,7 @@ class MainWindow(QMainWindow):
         layout.addWidget(self.btn_setting)
         
         # === Group Box untuk Options ===
-        options_group = QGroupBox("Option")
+        options_group = QGroupBox("OPTION")
         options_group.setFont(QFont("Arial", 10, QFont.Bold))
         options_layout = QVBoxLayout(options_group)
         options_layout.setContentsMargins(10, 15, 10, 10)
@@ -450,8 +450,8 @@ class MainWindow(QMainWindow):
             }
             QGroupBox::title {
                 subcontrol-origin: margin;
-                left: 100px;
-                padding: 2px 5px;
+                left: 92px;
+                padding: 1px 5px;
                 color: black;
             }
         """)
@@ -489,7 +489,7 @@ class MainWindow(QMainWindow):
         layout.addWidget(self.success_container)
         
         # === Group Box untuk Detection Output ===
-        all_text_group = QGroupBox("Detection Output")
+        all_text_group = QGroupBox("OUTPUT TEXT")
         all_text_group.setFont(QFont("Arial", 9, QFont.Bold))
         all_text_layout = QVBoxLayout(all_text_group)
         all_text_layout.setContentsMargins(10, 12, 10, 10)
@@ -502,8 +502,8 @@ class MainWindow(QMainWindow):
             }
             QGroupBox::title {
                 subcontrol-origin: margin;
-                left: 65px;
-                padding: 5px 5px;
+                left: 80px;
+                padding: 2px 5px;
                 color: black;
             }
         """)
@@ -561,6 +561,15 @@ class MainWindow(QMainWindow):
         Fungsi untuk membuka dialog SETTING
         Tujuan: Menampilkan dialog pengaturan camera, tipe, dan label
         """
+        # Cegah buka dialog saat kamera aktif
+        if self.logic and self.logic.running:
+            QMessageBox.warning(
+                self,
+                "Warning",
+                "Tidak dapat membuka SETTING saat kamera sedang aktif!\nHarap STOP kamera terlebih dahulu."
+            )
+            return
+        
         dialog = create_setting_dialog(
             self, 
             self.camera_combo, 
@@ -1015,6 +1024,20 @@ class MainWindow(QMainWindow):
         self.btn_camera_toggle.setStyleSheet(self.BUTTON_STYLES['danger'])  # Bootstrap danger (red) untuk aktif
         
         self._lock_label_and_type_controls()  # Lock preset dan label controls
+        
+        # Disable tombol SETTING saat kamera aktif dan ubah warna
+        self.btn_setting.setEnabled(False)
+        self.btn_setting.setStyleSheet("""
+            QPushButton {
+                background-color: #8787fa;
+                color: #e1e1e8;
+                font-weight: bold;
+                font-size: 13px;
+                border-radius: 4px;
+                padding: 8px 12px;
+                min-height: 32px;
+            }
+        """)
 
         # Set camera options dan start detection
         if self.logic:
@@ -1044,6 +1067,26 @@ class MainWindow(QMainWindow):
         self.btn_camera_toggle.setStyleSheet(self.BUTTON_STYLES['success'])  # Bootstrap success (green) untuk inactive
         
         self._unlock_label_and_type_controls()
+        
+        # Enable kembali tombol SETTING saat kamera stop dan kembalikan warna
+        self.btn_setting.setEnabled(True)
+        self.btn_setting.setStyleSheet("""
+            QPushButton {
+                background-color: #0000FF;
+                color: white;
+                font-weight: bold;
+                font-size: 13px;
+                border-radius: 4px;
+                padding: 8px 12px;
+                min-height: 32px;
+            }
+            QPushButton:hover {
+                background-color: #0000DD;
+            }
+            QPushButton:pressed {
+                background-color: #0000BB;
+            }
+        """)
 
         if self.logic:
             self.logic.stop_detection()
@@ -1276,6 +1319,19 @@ class MainWindow(QMainWindow):
     def _scan_file_thread(self, file_path):
         #Thread untuk scan image file tanpa block UI.
         if self.logic:
+            # CRITICAL FIX: Set preset dan target_label SEBELUM scan_file dipanggil.
+            # Tanpa ini self.preset di logic tetap default JIS saat scan file DIN,
+            # karena set_camera_options hanya dipanggil saat live camera (start_detection).
+            selected_type = self.jis_type_combo.currentText()
+            current_preset = self.preset_combo.currentText()
+            self.logic.set_camera_options(
+                current_preset,
+                False, False,
+                self.cb_edge.isChecked(),
+                self.cb_split.isChecked(),
+                2.0
+            )
+            self.logic.set_target_label(selected_type)
             self.logic.scan_file(file_path)
 
     def _handle_file_scan_result(self, result):
@@ -1469,12 +1525,12 @@ class MainWindow(QMainWindow):
         else:
             # Export berhasil - tampilkan custom dialog dengan button open folder
             self._show_export_success_dialog(result)
-            self._update_export_button_ui("Export Berhasil!", "success")
+            self._update_export_button_ui("EXPORT SUCCESS!", "success")
     
     def _show_export_success_dialog(self, filepath):
         """Tampilkan dialog sukses export dengan button untuk membuka folder."""
         msg_box = QMessageBox(self)
-        msg_box.setWindowTitle("Export Berhasil")
+        msg_box.setWindowTitle("Export Success")
         msg_box.setIcon(QMessageBox.Information)
         msg_box.setText(f"Data berhasil diekspor ke:\n{filepath}")
         

@@ -1,100 +1,104 @@
-# Konfigurasi PENGATURAN dan pengaturan aplikasi QC_GS-Battery
-# File ini berisi semua PENGATURAN yang digunakan di seluruh aplikasi untuk setup global
-# Tujuan: Centralized configuration untuk semua constants dan settings aplikasi
-# Fungsi: Menyediakan satu tempat untuk manage semua configuration values
+#Konfigurasi PENGATURAN dan pengaturan aplikasi QC_GS-Battery
+#File ini berisi semua PENGATURAN yang digunakan di seluruh aplikasi untuk setup global
+#Tujuan: Centralized configuration untuk semua constants dan settings aplikasi
+#Fungsi: Menyediakan satu tempat untuk manage semua configuration values
 
-import os  # File system operations | Modul untuk operasi file system (buat folder, cek path, dll)
-from PIL import Image  # Image processing library | Library untuk proses image (resize, format, dll)
+import os #File system operations | Modul untuk operasi file system (buat folder, cek path, dll)
+from PIL import Image #Image processing library | Library untuk proses image (resize, format, dll)
 
-# === PENGATURAN APLIKASI ===
-# Nilai-nilai tetap yang digunakan di seluruh aplikasi untuk konfigurasi umum
-# Tujuan: Define basic application information dan window dimensions
-APP_NAME = "QC_GS-Battery"  # Nama aplikasi utama | Tampil di window title dan UI
-APP_VERSION = "1.0.0"  # Versi aplikasi | Untuk tracking version updates
-WINDOW_WIDTH = 1293  # Lebar window utama (pixels) | Ukuran default window saat dibuka
-WINDOW_HEIGHT = 720  # Tinggi window utama (pixels) | Ukuran default window saat dibuka
-CONTROL_PANEL_WIDTH = 280  # Lebar panel kontrol sebelah kiri (pixels) | Tempat buttons dan controls
-RIGHT_PANEL_WIDTH = 280  # Lebar panel kanan untuk data display (pixels) | Tempat tabel dan export
+#PENGATURAN APLIKASI
+#Nilai-nilai tetap yang digunakan di seluruh aplikasi untuk konfigurasi umum
+#Tujuan: Define basic application information dan window dimensions
+APP_NAME = "QC_GS-Battery"  #Nama aplikasi utama | Tampil di window title dan UI
+APP_VERSION = "1.0.0" #Versi aplikasi | Untuk tracking version updates
+WINDOW_WIDTH = 1293 #Lebar window utama (pixels) | Ukuran default window saat dibuka
+WINDOW_HEIGHT = 720 #Tinggi window utama (pixels) | Ukuran default window saat dibuka
+CONTROL_PANEL_WIDTH = 280 #Lebar panel kontrol sebelah kiri (pixels) | Tempat buttons dan controls
+RIGHT_PANEL_WIDTH = 280 #Lebar panel kanan untuk data display (pixels) | Tempat tabel dan export
 
-# === DIREKTORI ===
-# Path folder untuk menyimpan berbagai jenis file aplikasi
-# Tujuan: Define storage locations untuk images, exports, dan database
-IMAGE_DIR = "images"  # Direktori untuk menyimpan gambar scan | Folder tempat screenshot kamera disimpan
-EXCEL_DIR = "file_excel"  # Direktori untuk menyimpan file Excel export | Folder tempat file export di-save
-DB_FILE = "detection.db"  # File database SQLite | Database file untuk menyimpan semua deteksi
+#DIREKTORI
+#Path folder untuk menyimpan berbagai jenis file aplikasi
+#Tujuan: Define storage locations untuk images, exports, dan database
+IMAGE_DIR = "images" #Direktori untuk menyimpan gambar scan | Folder tempat screenshot kamera disimpan
+EXCEL_DIR = "file_excel" #Direktori untuk menyimpan file Excel export | Folder tempat file export di-save
+DB_FILE = "detection.db" #File database SQLite | Database file untuk menyimpan semua deteksi
 
-# === KAMERA ===
-# PENGATURAN untuk konfigurasi kamera dan pengolahan frame
-# Tujuan: Define camera resolution dan processing parameters
-CAMERA_WIDTH = 1280  # Resolusi lebar kamera (pixels) | Ukuran capture dari kamera
-CAMERA_HEIGHT = 720  # Resolusi tinggi kamera (pixels) | Ukuran capture dari kamera
-TARGET_WIDTH = 640  # Lebar target untuk tampilan (pixels) | Ukuran display di UI
-TARGET_HEIGHT = 640  # Tinggi target untuk tampilan (pixels) | Ukuran display di UI
-BUFFER_SIZE = 1  # Ukuran buffer kamera (untuk mengurangi lag) | Jumlah frame yang di-buffer
-SCAN_INTERVAL = 2.0  # Interval scan OCR (detik) | Berapa lama tunggu sebelum scan ulang
-MAX_CAMERAS = 5  # Maksimal kamera yang dicek | Berapa banyak index kamera yang di-test
+#KAMERA
+#PENGATURAN untuk konfigurasi kamera dan pengolahan frame
+#Tujuan: Define camera resolution dan processing parameters
+CAMERA_WIDTH = 1280 #Resolusi lebar kamera (pixels) | Ukuran capture dari kamera
+CAMERA_HEIGHT = 720 #Resolusi tinggi kamera (pixels) | Ukuran capture dari kamera
+TARGET_WIDTH = 640 #Lebar target untuk tampilan (pixels) | Ukuran display di UI
+TARGET_HEIGHT = 640 #Tinggi target untuk tampilan (pixels) | Ukuran display di UI
+BUFFER_SIZE = 1 #Ukuran buffer kamera (untuk mengurangi lag) | Jumlah frame yang di-buffer
+SCAN_INTERVAL = 2.0 #Interval scan OCR (detik) | Berapa lama tunggu sebelum scan ulang
+MAX_CAMERAS = 5 #Maksimal kamera yang dicek | Berapa banyak index kamera yang di-test
 
-# === PENGATURAN RESAMPLING GAMBAR (KOMPATIBILITAS PILLOW) ===
-# Pillow adalah library Python yang digunakan untuk mengolah gambar,
-# seperti membaca, mengubah ukuran, dan memproses gambar.
-# Tujuan: Setup image resampling method yang compatible dengan berbagai versi Pillow
-# Fungsi: Fallback mechanism untuk support Pillow versi lama dan baru
+#PENGATURAN RESAMPLING GAMBAR (KOMPATIBILITAS PILLOW)
+#Pillow adalah library Python yang digunakan untuk mengolah gambar,
+#seperti membaca, mengubah ukuran, dan memproses gambar.
+#Tujuan: Setup image resampling method yang compatible dengan berbagai versi Pillow
+#Fungsi: Fallback mechanism untuk support Pillow versi lama dan baru
 
-# Resampling adalah proses menghitung ulang piksel gambar
-# saat gambar diperbesar atau diperkecil agar hasilnya tetap bagus.
+#Resampling adalah proses menghitung ulang piksel gambar
+#saat gambar diperbesar atau diperkecil agar hasilnya tetap bagus.
 
-# LANCZOS adalah metode resampling dengan kualitas tinggi
-# yang menghasilkan gambar lebih halus dan tajam,
-# sangat cocok untuk memperkecil atau memperbesar gambar.
+#LANCZOS adalah metode resampling dengan kualitas tinggi
+#yang menghasilkan gambar lebih halus dan tajam,
+#sangat cocok untuk memperkecil atau memperbesar gambar.
 
-# ANTIALIAS adalah metode lama untuk menghaluskan gambar
-# agar tidak terlihat pecah, biasanya tersedia di Pillow versi lama.
+#ANTIALIAS adalah metode lama untuk menghaluskan gambar agar tidak terlihat pecah, biasanya tersedia di Pillow versi lama.
 
 try:
-    # Coba gunakan metode LANCZOS dari Pillow versi terbaru (10.0+)
-    # Jika tersedia, ini adalah pilihan terbaik untuk kualitas gambar
+    #Coba gunakan metode LANCZOS dari Pillow versi terbaru (10.0+)
+    #Jika tersedia, ini adalah pilihan terbaik untuk kualitas gambar
     Resampling = Image.Resampling.LANCZOS
 
 except AttributeError:
     try:
-        # Jika Pillow versi lama tidak memiliki Image.Resampling
-        # Gunakan LANCZOS versi lama agar tetap kompatibel (Pillow 9.x)
+        #Jika Pillow versi lama tidak memiliki Image.Resampling
+        #Gunakan LANCZOS versi lama agar tetap kompatibel (Pillow 9.x)
         Resampling = Image.LANCZOS
 
     except AttributeError:
-        # Jika Pillow sangat lama dan LANCZOS tidak tersedia (Pillow < 9)
-        # Gunakan ANTIALIAS sebagai pilihan terakhir
+        #Jika Pillow sangat lama dan LANCZOS tidak tersedia (Pillow < 9)
+        #Gunakan ANTIALIAS sebagai pilihan terakhir
         Resampling = Image.ANTIALIAS
 
 
-# === PRESET DAN POLA ===
-# Preset format dan pattern OCR untuk deteksi kode yang berbeda
-# Tujuan: Define available presets dan regex patterns untuk OCR matching
-PRESETS = ["JIS", "DIN"]  # Daftar preset yang tersedia | Format kode yang bisa dideteksi
+#PRESET DAN POLA
+#Preset format dan pattern OCR untuk deteksi kode yang berbeda
+#Tujuan: Define available presets dan regex patterns untuk OCR matching
+PRESETS = ["JIS", "DIN"]  #Daftar preset yang tersedia | Format kode yang bisa dideteksi
 
-# Pattern format: [2-4 HURUF] [ANGKA][HURUF OPSIONAL] [HURUF OPSIONAL]
-# Contoh DIN: LBN 1, LN0 260A, LN4 776A ISS
-# Contoh JIS: 26A17, 28B19L, 50D23R(S)
+#Pattern format: [2-4 HURUF] [ANGKA][HURUF OPSIONAL] [HURUF OPSIONAL]
+#Contoh DIN: LBN 1, LN0 260A, LN4 776A ISS
+#Contoh JIS: 26A17, 28B19L, 50D23R(S)
 PATTERNS = {
-    "JIS": r"\b\d{2,3}[A-H]\d{2,3}[LR]?(?:\(S\))?\b",  # Pattern untuk format JIS | Untuk match kode JIS
-    "DIN": r"^[A-Z]{2,4}\s+\d+[A-Z]?(?:\s+[A-Z]+)?$"   # Pattern untuk format DIN | Untuk match kode DIN
+    "JIS": r"\b\d{2,3}[A-H]\d{2,3}[LR]?(?:\(S\))?\b",
+    # DIN pattern support semua format:
+    # - LBN 1/2/3
+    # - LN0-LN6 tanpa kapasitas
+    # - LN0-LN6 + kapasitas: LN4 776A, LN4 776A ISS, LN4 650A, LN6 1000A
+    # - Reverse format: [angka]LN[0-6] contoh: 650LN4, 1000LN6
+    "DIN": r"(?:LBN\s*\d|LN[0-6](?:\s+\d{2,4}[A-Z]?(?:\s+ISS)?)?|\d{2,4}LN[0-6])"
 }
 
-# === ALLOWLIST KARAKTER OCR ===
-# Karakter yang diizinkan dalam OCR untuk mengurangi false positive detection
-# Tujuan: Limit OCR recognition ke karakter yang valid saja
-# Fungsi: Improve OCR accuracy dengan membatasi character set
-ALLOWLIST_JIS = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYLRS()'  # Karakter yang diizinkan untuk JIS OCR | Validasi hasil OCR JIS
-ALLOWLIST_DIN = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ '     # Karakter yang diizinkan untuk DIN OCR | Validasi hasil OCR DIN
+#ALLOWLIST KARAKTER OCR
+#Karakter yang diizinkan dalam OCR untuk mengurangi false positive detection
+#Tujuan: Limit OCR recognition ke karakter yang valid saja
+#Fungsi: Improve OCR accuracy dengan membatasi character set
+ALLOWLIST_JIS = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYLRS()'  #Karakter yang diizinkan untuk JIS OCR | Validasi hasil OCR JIS
+ALLOWLIST_DIN = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ '     #Karakter yang diizinkan untuk DIN OCR | Validasi hasil OCR DIN
 
-# === JIS TYPES (LABEL) ===
-# Daftar semua tipe/label JIS yang valid untuk dipilih user
-# Tujuan: Provide complete list of valid JIS battery codes
-# Fungsi: Digunakan untuk validasi input user dan dropdown options
-# Format JIS: [Capacity][Type Letter][Size][Terminal (L/R)][Special Marker (S)]
-# Contoh: 50D23R(S) = 50 capacity, D type, 23 size, R terminal, (S) special
+#JIS TYPES (LABEL)
+#Daftar semua tipe/label JIS yang valid untuk dipilih user
+#Tujuan: Provide complete list of valid JIS battery codes
+#Fungsi: Digunakan untuk validasi input user dan dropdown options
+#Format JIS: [Capacity][Type Letter][Size][Terminal (L/R)][Special Marker (S)]
+#Contoh: 50D23R(S) = 50 capacity, D type, 23 size, R terminal, (S) special
 JIS_TYPES = [
-    "Select Label . . .",  # Placeholder - tidak valid untuk scanning
+    "Select Label . . .",  #Placeholder - tidak valid untuk scanning
     "26A17", "26A17L", "26A17R", "26A17L(S)", "26A17R(S)",
     "26A19", "26A19L", "26A19R", "26A19L(S)", "26A19R(S)",
     "28A19", "28A19L", "28A19R", "28A19L(S)", "28A19R(S)",
@@ -168,32 +172,97 @@ JIS_TYPES = [
     "245H52", "245H52L", "245H52R", "245H52L(S)", "245H52R(S)",
 ]
 
-# === DIN TYPES (LABEL) ===
-# Daftar semua tipe/label DIN yang valid untuk dipilih user
-# Tujuan: Provide complete list of valid DIN battery codes
-# Fungsi: Digunakan untuk validasi input user dan dropdown options
-# Format DIN: [Prefix] [Capacity+Letter] [Optional ISS marker]
-# Contoh: LN4 776A ISS = LN4 prefix, 776A capacity rating, ISS marker
+#DIN TYPES (LABEL)
+#Daftar semua tipe/label DIN yang valid untuk dipilih user
+#Tujuan: Provide complete list of valid DIN battery codes
+#Fungsi: Digunakan untuk validasi input user dan dropdown options
+#Format DIN: [Prefix] [Capacity+Letter] [Optional ISS marker]
+#Contoh: LN4 776A ISS = LN4 prefix, 776A capacity rating, ISS marker
 DIN_TYPES = [
-    "Select Label . . .",  # Placeholder - tidak valid untuk scanning
+    "Select Label . . .",  #Placeholder - tidak valid untuk scanning
+
+    # ===== Format Lama: LBN dan LN tanpa/dengan kapasitas =====
     "LBN 1", "LBN 2", "LBN 3",
-    "LN1 450A", "LN1 295A",
-    "LN0 260A",
-    "LN2 360A", "LN2 345A",
-    "LN3 490A",
-    "LN4 650A", "LN4 776A ISS"
+    "LN1", "LN2", "LN3", "LN4",
+    "LN0 260A", "260LN0",
+    "LN1 295A", "295LN1", "LN1 450A", "450LN1",
+    "LN2 345A", "345LN2", "LN2 360A", "360LN2",
+    "LN3 490A", "490LN3",
+    "LN4 650A", "650LN4", "LN4 776A ISS",
+
+    # ===== Format Baru: [Kapasitas]LN[0] =====
+    "250LN0", "270LN0", "280LN0", "300LN0", "320LN0", "330LN0",
+    "335LN0", "350LN0", "360LN0", "380LN0", "400LN0",
+
+    # ===== Format Baru: [Kapasitas]LN[1] =====
+    "250LN1", "270LN1", "280LN1", "295LN1", "300LN1", "320LN1",
+    "330LN1", "350LN1", "360LN1", "380LN1", "400LN1", "420LN1",
+    "440LN1", "450LN1", "460LN1", "480LN1", "500LN1", "520LN1", "540LN1",
+
+    # ===== Format Baru: [Kapasitas]LN[2] =====
+    "345LN2", "350LN2", "355LN2", "360LN2", "380LN2", "400LN2",
+    "420LN2", "440LN2", "450LN2", "480LN2", "500LN2", "520LN2",
+    "540LN2", "550LN2", "560LN2", "580LN2", "600LN2", "620LN2",
+
+    # ===== Format Baru: [Kapasitas]LN[3] =====
+    "450LN3", "480LN3", "490LN3", "500LN3", "520LN3", "540LN3",
+    "550LN3", "560LN3", "580LN3", "600LN3", "620LN3", "650LN3",
+    "680LN3", "700LN3", "720LN3",
+
+    # ===== Format Baru: [Kapasitas]LN[4] =====
+    "390LN4", "550LN4", "580LN4", "600LN4", "620LN4", "650LN4",
+    "680LN4", "700LN4", "720LN4", "750LN4", "780LN4", "800LN4", "820LN4",
+
+    # ===== Format Baru: [Kapasitas]LN[5] =====
+    "650LN5", "680LN5", "700LN5", "720LN5", "750LN5", "780LN5",
+    "800LN5", "820LN5", "850LN5", "880LN5", "900LN5", "920LN5",
+
+    # ===== Format Baru: [Kapasitas]LN[6] =====
+    "750LN6", "780LN6", "800LN6", "820LN6", "850LN6", "880LN6",
+    "900LN6", "920LN6", "950LN6", "980LN6", "1000LN6", "1050LN6", "1100LN6",
+
+    # ===== Format Baru: LN[0] [Kapasitas]A =====
+    "LN0 250A", "LN0 270A", "LN0 280A", "LN0 300A", "LN0 320A", "LN0 330A",
+    "LN0 335A", "LN0 350A", "LN0 360A", "LN0 380A", "LN0 400A",
+
+    # ===== Format Baru: LN[1] [Kapasitas]A =====
+    "LN1 250A", "LN1 270A", "LN1 280A", "LN1 295A", "LN1 300A", "LN1 320A",
+    "LN1 330A", "LN1 350A", "LN1 360A", "LN1 380A", "LN1 400A", "LN1 420A",
+    "LN1 440A", "LN1 450A", "LN1 460A", "LN1 480A", "LN1 500A", "LN1 520A", "LN1 540A",
+
+    # ===== Format Baru: LN[2] [Kapasitas]A =====
+    "LN2 345A", "LN2 350A", "LN2 355A", "LN2 360A", "LN2 380A", "LN2 400A",
+    "LN2 420A", "LN2 440A", "LN2 450A", "LN2 480A", "LN2 500A", "LN2 520A",
+    "LN2 540A", "LN2 550A", "LN2 560A", "LN2 580A", "LN2 600A", "LN2 620A",
+
+    # ===== Format Baru: LN[3] [Kapasitas]A =====
+    "LN3 450A", "LN3 480A", "LN3 490A", "LN3 500A", "LN3 520A", "LN3 540A",
+    "LN3 550A", "LN3 560A", "LN3 580A", "LN3 600A", "LN3 620A", "LN3 650A",
+    "LN3 680A", "LN3 700A", "LN3 720A",
+
+    # ===== Format Baru: LN[4] [Kapasitas]A =====
+    "LN4 390A", "LN4 550A", "LN4 580A", "LN4 600A", "LN4 620A", "LN4 650A",
+    "LN4 680A", "LN4 700A", "LN4 720A", "LN4 750A", "LN4 780A", "LN4 800A", "LN4 820A",
+
+    # ===== Format Baru: LN[5] [Kapasitas]A =====
+    "LN5 650A", "LN5 680A", "LN5 700A", "LN5 720A", "LN5 750A", "LN5 780A",
+    "LN5 800A", "LN5 820A", "LN5 850A", "LN5 880A", "LN5 900A", "LN5 920A",
+
+    # ===== Format Baru: LN[6] [Kapasitas]A =====
+    "LN6 750A", "LN6 780A", "LN6 800A", "LN6 820A", "LN6 850A", "LN6 880A",
+    "LN6 900A", "LN6 920A", "LN6 950A", "LN6 980A", "LN6 1000A", "LN6 1050A", "LN6 1100A",
 ]
 
-# === MONTHS ===
-# Daftar bulan dalam bahasa Indonesia untuk dropdown date selection
-# Tujuan: Provide month names untuk date picker dan export dialog
-# Fungsi: User-friendly month selection dalam bahasa Indonesia
+#MONTHS
+#Daftar bulan dalam bahasa Indonesia untuk dropdown date selection
+#Tujuan: Provide month names untuk date picker dan export dialog
+#Fungsi: User-friendly month selection dalam bahasa Indonesia
 MONTHS = ["January", "February", "March", "April", "May", "June", 
           "July", "August", "September", "Oktober", "November", "Desember"]
 
-# Mapping nama bulan ke nomor bulan (1-12)
-# Tujuan: Convert nama bulan Indonesia ke integer untuk date processing
-# Fungsi: Digunakan saat build date range untuk export filtering
+#Mapping nama bulan ke nomor bulan (1-12)
+#Tujuan: Convert nama bulan Indonesia ke integer untuk date processing
+#Fungsi: Digunakan saat build date range untuk export filtering
 MONTH_MAP = {
     "January": 1, "February": 2, "March": 3, "April": 4, "May": 5, "June": 6, 
     "July": 7, "August": 8, "September": 9, "Oktober": 10, "November": 11, "Desember": 12

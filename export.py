@@ -9,25 +9,25 @@ from config import DB_FILE, Resampling  #Import konfigurasi database file dan re
 
 
 def execute_export(sql_filter="", date_range_desc="", export_label="", current_preset="", progress_callback=None):
-    # Fungsi utama untuk mengeksekusi proses export ke Excel dengan filter | Tujuan: Create Excel file dari database dengan styling dan gambar
-    # Parameter: sql_filter (WHERE clause), date_range_desc (deskripsi range), export_label (label filter), current_preset (JIS/DIN), progress_callback (fungsi untuk update progress)
-    # Return: String path ke file Excel yang dibuat, atau error message jika gagal
+    #Fungsi utama untuk mengeksekusi proses export ke Excel dengan filter | Tujuan: Create Excel file dari database dengan styling dan gambar
+    #Parameter: sql_filter (WHERE clause), date_range_desc (deskripsi range), export_label (label filter), current_preset (JIS/DIN), progress_callback (fungsi untuk update progress)
+    #Return: String path ke file Excel yang dibuat, atau error message jika gagal
     
-    # Helper function untuk update progress
+    #Helper function untuk update progress
     def update_progress(current, total, message=""):
         if progress_callback:
             progress_callback(current, total, message)
     
-    # Generate nama file Excel dengan timestamp agar unik
-    # Format: Karton_Report_YYYYMMDD_HHMMSS.xlsx
+    #Generate nama file Excel dengan timestamp agar unik
+    #Format: Karton_Report_YYYYMMDD_HHMMSS.xlsx
     excel_filename = f"Karton_Report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
     
     from config import EXCEL_DIR #Import direktori output Excel dari config
     
     output_path = os.path.join(EXCEL_DIR, excel_filename) #Gabungkan path direktori dengan nama file untuk mendapat full path
 
-    # List untuk menyimpan path file temporary yang perlu dibersihkan nanti
-    # File temporary dibuat saat resize image untuk Excel
+    #List untuk menyimpan path file temporary yang perlu dibersihkan nanti
+    #File temporary dibuat saat resize image untuk Excel
     temp_files_to_clean = []
 
     try:
@@ -38,26 +38,26 @@ def execute_export(sql_filter="", date_range_desc="", export_label="", current_p
         
         update_progress(5, 100, "Memeriksa struktur database...")
         
-        # Check kolom apa saja yang ada di table
-        # PRAGMA table_info mengembalikan informasi struktur tabel
+        #Check kolom apa saja yang ada di table
+        #PRAGMA table_info mengembalikan informasi struktur tabel
         cursor.execute("PRAGMA table_info(detected_codes)")
-        columns = [column[1] for column in cursor.fetchall()]  # Ambil nama kolom (index 1)
+        columns = [column[1] for column in cursor.fetchall()]  #Ambil nama kolom (index 1)
         
-        # Cek apakah kolom 'status' dan 'target_session' ada di tabel
-        # Ini untuk backward compatibility dengan database lama yang mungkin belum punya kolom ini
+        #Cek apakah kolom 'status' dan 'target_session' ada di tabel
+        #Ini untuk backward compatibility dengan database lama yang mungkin belum punya kolom ini
         has_status = 'status' in columns
         has_target_session = 'target_session' in columns
         
         update_progress(10, 100, "Mengambil data dari database...")
         
-        # Build query berdasarkan schema yang ada
-        # Jika kolom status dan target_session ada, gunakan kolom asli
+        #Build query berdasarkan schema yang ada
+        #Jika kolom status dan target_session ada, gunakan kolom asli
         if has_status and has_target_session:
             query = f"SELECT timestamp, code, preset, image_path, status, target_session FROM detected_codes {sql_filter} ORDER BY timestamp ASC"
-        # Jika hanya status yang ada, gunakan 'code' sebagai fallback untuk target_session
+        #Jika hanya status yang ada, gunakan 'code' sebagai fallback untuk target_session
         elif has_status:
             query = f"SELECT timestamp, code, preset, image_path, status, code as target_session FROM detected_codes {sql_filter} ORDER BY timestamp ASC"
-        # Jika tidak ada status dan target_session, gunakan default 'OK' dan 'code'
+        #Jika tidak ada status dan target_session, gunakan default 'OK' dan 'code'
         else:
             query = f"SELECT timestamp, code, preset, image_path, 'OK' as status, code as target_session FROM detected_codes {sql_filter} ORDER BY timestamp ASC"
         
@@ -65,33 +65,33 @@ def execute_export(sql_filter="", date_range_desc="", export_label="", current_p
         
         conn.close() #Tutup koneksi database setelah selesai query
         
-        # Jika tidak ada data, return early dengan kode "NO_DATA"
-        # Parent function akan handle message ini untuk tampilkan ke user
+        #Jika tidak ada data, return early dengan kode "NO_DATA"
+        #Parent function akan handle message ini untuk tampilkan ke user
         if df.empty:
             update_progress(100, 100, "Tidak ada data")
             return "NO_DATA"
 
         update_progress(15, 100, "Memproses data...")
 
-        # Gunakan current_preset dari parameter
-        # Preset menentukan standard battery (JIS/DIN)
+        #Gunakan current_preset dari parameter
+        #Preset menentukan standard battery (JIS/DIN)
         export_preset = current_preset if current_preset else "Mixed"
         
-        # Jika tidak ada preset yang diberikan, deteksi dari data
+        #Jika tidak ada preset yang diberikan, deteksi dari data
         if not current_preset:
-            # Cek apakah kolom 'preset' ada di DataFrame
+            #Cek apakah kolom 'preset' ada di DataFrame
             if 'preset' in df.columns and not df['preset'].empty:
                 unique_presets = df['preset'].unique() #Ambil semua unique preset dari data
-                # Jika hanya 1 preset, gunakan itu
+                #Jika hanya 1 preset, gunakan itu
                 if len(unique_presets) == 1:
                     export_preset = unique_presets[0]
                 else:
-                    # Jika mixed preset, gunakan yang paling sering muncul (mode)
+                    #Jika mixed preset, gunakan yang paling sering muncul (mode)
                     export_preset = df['preset'].mode()[0] if not df['preset'].mode().empty else "Mixed"
 
-        # Tentukan label untuk display di Excel header
-        # Jika ada filter label spesifik, tampilkan nama label
-        # Jika "All Label", tampilkan "All Labels"
+        #Tentukan label untuk display di Excel header
+        #Jika ada filter label spesifik, tampilkan nama label
+        #Jika "All Label", tampilkan "All Labels"
         if export_label and export_label != "All Label":
             label_display = export_label
         else:
@@ -99,38 +99,37 @@ def execute_export(sql_filter="", date_range_desc="", export_label="", current_p
 
         update_progress(20, 100, "Menghitung statistik...")
 
-        # Hitung statistik untuk ditampilkan di header Excel
-        qty_actual = len(df)  # Total semua data
-        qty_ok = len(df[df['status'] == 'OK'])  # Jumlah data dengan status OK
-        qty_not_ok = len(df[df['status'] == 'Not OK'])  # Jumlah data dengan status Not OK
+        #Hitung statistik untuk ditampilkan di header Excel
+        qty_actual = len(df)  #Total semua data
+        qty_ok = len(df[df['status'] == 'OK'])  #Jumlah data dengan status OK
+        qty_not_ok = len(df[df['status'] == 'Not OK'])  #Jumlah data dengan status Not OK
         
-        # FIXED: Start data di row 7 (karena info header 1-6)
-        # Row 1-6 digunakan untuk info header (Date, Type, Label, OK, Not OK, QTY)
-        # Row 7 adalah header tabel (No, Image, Label, Date/Time, dll)
-        # Row 8 dst adalah data
+        #Row 1-6 digunakan untuk info header (Date, Type, Label, OK, Not OK, QTY)
+        #Row 7 adalah header tabel (No, Image, Label, Date/Time, dll)
+        #Row 8 dst adalah data
         START_ROW_DATA = 7
 
         update_progress(25, 100, "Menyiapkan data untuk Excel...")
 
-        # Prepare data untuk Excel
-        # Konversi kolom timestamp ke datetime object untuk formatting yang benar
+        #Prepare data untuk Excel
+        #Konversi kolom timestamp ke datetime object untuk formatting yang benar
         df['timestamp'] = pd.to_datetime(df['timestamp'])
         
-        # Insert kolom 'No' di posisi pertama dengan nomor urut 1, 2, 3, ...
+        #Insert kolom 'No' di posisi pertama dengan nomor urut 1, 2, 3, ...
         df.insert(0, 'No', range(1, 1 + len(df)))
         
-        # Insert kolom 'Image' placeholder (akan diisi dengan gambar actual nanti)
-        df['Image'] = ""  # Placeholder untuk image column
+        #Insert kolom 'Image' placeholder (akan diisi dengan gambar actual nanti)
+        df['Image'] = ""  #Placeholder untuk image column
         
-        # Rename columns ke nama yang user-friendly
-        # Nama internal database -> Nama untuk display di Excel
+        #Rename columns ke nama yang user-friendly
+        #Nama internal database -> Nama untuk display di Excel
         df.rename(columns={
-            'timestamp': 'Date/Time',  # timestamp -> Date/Time
-            'code': 'Label',  # code -> Label
-            'preset': 'Standard',  # preset -> Standard
-            'image_path': 'Image Path',  # image_path -> Image Path
-            'status': 'Status',  # status -> Status
-            'target_session': 'Target Session'  # target_session -> Target Session
+            'timestamp': 'Date/Time',  #timestamp -> Date/Time
+            'code': 'Label',  #code -> Label
+            'preset': 'Standard',  #preset -> Standard
+            'image_path': 'Image Path',  #image_path -> Image Path
+            'status': 'Status',  #status -> Status
+            'target_session': 'Target Session'  #target_session -> Target Session
         }, inplace=True)
         
         # Reorder columns agar sesuai urutan yang diinginkan di Excel
@@ -158,7 +157,7 @@ def execute_export(sql_filter="", date_range_desc="", export_label="", current_p
         
         # Define format untuk header tabel (row 7)
         # Bold, centered, abu-abu background
-        header_format = workbook.add_format({'bold': True, 'align': 'center', 'valign': 'vcenter', 'bg_color': '#D3D3D3'})
+        header_format = workbook.add_format({'bold': True, 'align': 'center', 'valign': 'vcenter', 'font_color': 'white', 'bg_color': '#596CDAAD'})
         
         # Define format untuk info rows (1-6)
         # Bold, aligned left, font size 11

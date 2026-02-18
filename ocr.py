@@ -355,57 +355,198 @@ class DetectionLogic(threading.Thread):
         self.update_signal.emit(img) #Emit signal untuk update preview UI dengan PIL Image
     
     def _normalize_din_code(self, code):
-        # Fungsi untuk normalisasi format DIN code
-        # Tujuan: Standarisasi spacing dan format DIN code
-        # Parameter: code (string) - raw DIN code
-        # Return: normalized DIN code dengan spacing yang benar
+        # FIXED: Normalisasi format DIN code yang lebih komprehensif
+        # Menangani semua format di DIN_TYPES termasuk: LBN 1, LN4, LN4 776A ISS, 450LN1, dll
         
-        code = code.strip().upper() #Trim whitespace dan uppercase
-        code_no_space = re.sub(r'\s+', '', code) #Hapus semua spasi untuk processing
+        code = code.strip().upper()
+        code_no_space = re.sub(r'\s+', '', code)  # Hapus semua spasi untuk processing
         
-        # Pattern 1: LBN + digit (contoh: LBN3 -> "LBN 3")
+        # ===== HANDLE REVERSE FORMAT: angka di depan (contoh: 450LN1, 260LN0) =====
+        # Format: [digit+opsional huruf][LN][digit] -> convert ke LN[digit] [digit+huruf]
+        match = re.match(r'^(\d+[A-Z]?)(LN\d)$', code_no_space)
+        if match:
+            return f"{match.group(2)} {match.group(1)}"
+        
+        # Pattern 1: LBN + digit saja (contoh: LBN1, LBN2, LBN3)
         match = re.match(r'^(LBN)(\d)$', code_no_space)
         if match:
             return f"{match.group(1)} {match.group(2)}"
         
-        # Pattern 2: LN + digit + kapasitas + huruf (contoh: LN260A -> "LN2 60A")
-        match = re.match(r'^(LN\d)(\d+)([A-Z])$', code_no_space)
+        # Pattern 2: LN + digit saja (contoh: LN1, LN2, LN3, LN4) - tanpa kapasitas
+        match = re.match(r'^(LN\d)$', code_no_space)
         if match:
-            return f"{match.group(1)} {match.group(2)}{match.group(3)}"
+            return match.group(1)  # Return as-is, tidak perlu spasi
         
-        # Pattern 3: Pattern 2 + ISS (contoh: LN260AISS -> "LN2 60A ISS")
+        # Pattern 3: LN + digit + kapasitas angka + huruf suffix + ISS
+        # Contoh: LN4776AISS -> "LN4 776A ISS"
         match = re.match(r'^(LN\d)(\d+)([A-Z])(ISS)$', code_no_space)
         if match:
             return f"{match.group(1)} {match.group(2)}{match.group(3)} {match.group(4)}"
         
-        return re.sub(r'\s+', ' ', code).strip() #Default: normalize multiple spaces menjadi single space
-    
-    def _find_best_din_match(self, detected_text):
-        # Fungsi untuk mencari DIN type terbaik yang match dengan detected text
-        # Tujuan: Fuzzy matching antara detected text dengan daftar DIN_TYPES
-        # Parameter: detected_text (string) - text hasil OCR
-        # Return: tuple (best_match, best_score) atau (None, 0.0) jika tidak ada match
-        detected_normalized = self._normalize_din_code(detected_text) #Normalize detected text
-        detected_clean = detected_normalized.replace(' ', '').upper() #Hapus spasi untuk comparison
+        # Pattern 4: LN + digit + kapasitas angka + huruf suffix
+        # Contoh: LN4776A -> "LN4 776A", LN1450A -> "LN1 450A"
+        match = re.match(r'^(LN\d)(\d+)([A-Z])$', code_no_space)
+        if match:
+            return f"{match.group(1)} {match.group(2)}{match.group(3)}"
         
-        # Variabel untuk menyimpan match terbaik
+        # Pattern 5: LN + digit + kapasitas angka saja (tanpa huruf suffix)
+        # Contoh: LN2360 -> "LN2 360"
+        match = re.match(r'^(LN\d)(\d+)$', code_no_space)
+        if match:
+            return f"{match.group(1)} {match.group(2)}"
+        
+        # Pattern 6: sudah punya spasi yang benar - normalize saja
+        # Pastikan format "LN4 776A ISS" konsisten
+        # Jika sudah dalam format dengan spasi, normalisasi ISS spacing
+        code_spaced = re.sub(r'\s+', ' ', code).strip()
+        code_spaced = re.sub(r'([A-Z0-9])(ISS)$', r'\1 \2', code_spaced)
+        
+        return code_spaced
+    
+    def _correct_din_structure(self, text):
+        """
+        Koreksi struktural DIN. Support semua format:
+        - Format LBN : LBN 1, LBN 2, LBN 3
+        - Format LN  : LN4, LN4 776A ISS
+        - Format LN+A: LN4 650A, LN6 1000A  (kapasitas diakhiri A)
+        - Format Rev : 650LN4, 1000LN6  (angka di depan)
+        OCR sering salah baca: O->0, S->5, I->1 — dikoreksi per posisi.
+        """
+        digit_map = {'O':'0','Q':'0','I':'1','L':'1','Z':'2','S':'5','G':'6','B':'8'}
+
+        text = text.strip().upper()
+        text = re.sub(r'[^A-Z0-9\s]', '', text)
+        text = re.sub(r'\s+', ' ', text).strip()
+
+        # ===== FORMAT REVERSE: [angka/noise]LN[0-6] =====
+        # Contoh: "650LN4", "65OLN4", "8SOLN5", "1OOOLN6"
+        # Harus dicek SEBELUM format LN-di-depan agar tidak konflik
+        m_rev = re.match(r'^([0-9A-Z]{2,4})\s*LN\s*([0-6])\s*$', text)
+        if m_rev:
+            corrected_num = ''.join(digit_map.get(c, c) for c in m_rev.group(1))
+            return f"{corrected_num}LN{m_rev.group(2)}"
+
+        # ===== FORMAT LN + KAPASITAS + A: LN[0-6] [angka]A =====
+        # Contoh: "LN4 650A", "LN6 1000A", "LN5 85OA" (O->0)
+        # Kapasitas bisa 2-4 digit diikuti huruf A (atau noise mirip A)
+        m_lna = re.match(r'^(LN[0-6])\s+([0-9A-Z]{2,4})([A-Z])\s*$', text)
+        if m_lna:
+            prefix   = m_lna.group(1)
+            raw_cap  = m_lna.group(2)
+            suffix   = m_lna.group(3)
+            corrected_cap = ''.join(digit_map.get(c, c) for c in raw_cap)
+            # Pastikan suffix adalah A (bukan noise)
+            corrected_suffix = 'A' if suffix in ['A', '4'] else suffix
+            return f"{prefix} {corrected_cap}{corrected_suffix}"
+
+        # ===== FORMAT LAMA: LBN/LN di depan tanpa A =====
+        # Insert spasi jika token menempel: "LN4776A" -> "LN4 776A", "LBN1" -> "LBN 1"
+        text = re.sub(r'^(LBN)(\d)', r' ', text)
+        text = re.sub(r'^(LN[0-6])(\d)', r' ', text)
+        text = re.sub(r'([A-Z0-9])\s*(ISS)$', r' ISS', text)
+        text = re.sub(r'\s+', ' ', text).strip()
+
+        tokens = text.split()
+        if not tokens:
+            return text
+
+        corrected_tokens = []
+        for i, token in enumerate(tokens):
+            if i == 0:
+                # TOKEN 0: Prefix (LBN atau LN0-LN6)
+                corrected = ''
+                for j, char in enumerate(token):
+                    if j == 0:
+                        corrected += 'L' if char in ['1', 'I', 'l'] else char
+                    elif j == 1:
+                        if char == '8':          corrected += 'B'
+                        elif char in ['H','M']:  corrected += 'N'
+                        else:                    corrected += char
+                    elif j == 2:
+                        if corrected == 'LB':
+                            corrected += 'N' if char in ['H','M'] else char
+                        else:
+                            corrected += digit_map.get(char, char)
+                    else:
+                        corrected += char
+                corrected_tokens.append(corrected)
+
+            elif i == 1:
+                # TOKEN 1: Kapasitas (angka + suffix huruf opsional: 776A, 295A)
+                corrected = ''
+                for j, char in enumerate(token):
+                    is_last = (j == len(token) - 1)
+                    if char.isdigit():
+                        corrected += char
+                    elif is_last and char.isalpha():
+                        corrected += 'A' if char == '4' else char
+                    else:
+                        corrected += digit_map.get(char, char)
+                corrected_tokens.append(corrected)
+
+            elif i == 2:
+                # TOKEN 2: Marker ISS
+                norm = token.replace('5','S').replace('1','I').replace('0','O')
+                corrected_tokens.append('ISS' if norm == 'ISS' else token)
+
+            else:
+                corrected_tokens.append(token)
+
+        return ' '.join(corrected_tokens)
+    def _find_best_din_match(self, detected_text):
+        """
+        MENIRU _find_best_jis_match untuk DIN:
+        TAHAP 1: Koreksi struktural (_correct_din_structure)
+        TAHAP 2: Fuzzy match ke DIN_TYPES (threshold 0.85)
+        TAHAP 3: Fallback matching tanpa suffix/marker
+        """
+        # TAHAP 1: Koreksi struktural dulu (meniru _correct_jis_structure)
+        detected_corrected = self._correct_din_structure(detected_text)
+        detected_clean = detected_corrected.replace(' ', '').upper()
+
         best_match = None
         best_score = 0.0
-        
-        # Loop setiap DIN type di config (skip index 0 yang biasanya placeholder)
+
+        # TAHAP 2: Exact match
         for din_type in DIN_TYPES[1:]:
-            target_clean = din_type.replace(' ', '').upper() #Hapus spasi dari target untuk comparison
-            
-            # Hitung similarity ratio menggunakan SequenceMatcher
-            # ratio() return nilai 0.0-1.0 (0=completely different, 1=identical)
+            target_clean = din_type.replace(' ', '').upper()
+            if detected_clean == target_clean:
+                return din_type, 1.0
+
+        # TAHAP 3: Fuzzy match (meniru loop pertama _find_best_jis_match, threshold 0.85)
+        for din_type in DIN_TYPES[1:]:
+            target_clean = din_type.replace(' ', '').upper()
             ratio = SequenceMatcher(None, detected_clean, target_clean).ratio()
-            
-            # Update best match jika ratio > 0.8 dan lebih baik dari score sebelumnya
-            if ratio > 0.8 and ratio > best_score:
+            if ratio > 0.85 and ratio > best_score:
                 best_score = ratio
                 best_match = din_type
-        
-        return best_match, best_score #Return best match dan score
+
+        # TAHAP 4: Fallback - match tanpa suffix ISS (meniru fallback JIS tanpa (S))
+        # Berguna saat OCR tidak menangkap "ISS" di akhir kode
+        if not best_match or best_score < 0.90:
+            detected_without_iss = re.sub(r'\s*ISS$', '', detected_clean)
+
+            for din_type in DIN_TYPES[1:]:
+                target_without_iss = re.sub(r'ISS$', '', din_type.replace(' ', '').upper())
+                ratio = SequenceMatcher(None, detected_without_iss, target_without_iss).ratio()
+
+                if ratio > 0.90:
+                    # Jika detected punya ISS, cari versi dengan ISS di DIN_TYPES
+                    if 'ISS' in detected_clean:
+                        candidate_with_iss = din_type.replace(' ', '').upper()
+                        if not candidate_with_iss.endswith('ISS'):
+                            candidate_iss = din_type + ' ISS' if ' ISS' not in din_type else din_type
+                            if candidate_iss in DIN_TYPES:
+                                best_match = candidate_iss
+                                best_score = ratio
+                                break
+                    else:
+                        # Tanpa ISS: ambil versi tanpa ISS dari DIN_TYPES
+                        if 'ISS' not in din_type and ratio > best_score:
+                            best_match = din_type
+                            best_score = ratio
+
+        return best_match, best_score
     
     def _correct_jis_structure(self, text):
         """
@@ -517,9 +658,15 @@ class DetectionLogic(threading.Thread):
         Tujuan: Main function untuk scan frame dan detect battery code
         Parameter: frame (numpy array), is_static (boolean), original_frame (untuk save)
         """
+        # CRITICAL FIX: Snapshot preset dan target_label di awal fungsi ini,
+        # sebelum thread lain bisa mengubah self.preset via set_camera_options().
+        # Tanpa snapshot ini, DIN bisa berubah jadi JIS di tengah eksekusi scan.
+        current_preset = self.preset
+        current_target_label = self.target_label
+
         # Variabel untuk menyimpan hasil match terbaik
         best_match = None
-        best_match_bbox = None  # ADDED: Simpan bounding box untuk match terbaik
+        best_match_bbox = None
         
         # Frame yang akan disave: gunakan original jika ada, fallback ke frame
         frame_to_save = original_frame if original_frame is not None else frame
@@ -579,197 +726,133 @@ class DetectionLogic(threading.Thread):
             else:
                 frame_small = frame
             
-            gray = cv2.cvtColor(frame_small, cv2.COLOR_BGR2GRAY) # Convert frame ke grayscale untuk preprocessing
-            processing_stages = {} # Dictionary untuk menyimpan berbagai preprocessing stages
+            gray = cv2.cvtColor(frame_small, cv2.COLOR_BGR2GRAY)
+            processing_stages = {}
             
-            # Preprocessing berbeda untuk DIN vs JIS
-            if self.preset == "DIN":
-                # DIN: Gunakan CLAHE (Contrast Limited Adaptive Histogram Equalization)
-                clahe = cv2.createCLAHE(clipLimit=3.0, tileGridSize=(8,8))
-                enhanced = clahe.apply(gray)
-                processing_stages['Enhanced'] = enhanced
-                
-                # Binary threshold dengan Otsu
-                _, binary1 = cv2.threshold(enhanced, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
-                processing_stages['Binary_Otsu'] = binary1
-                
-                # Adaptive threshold Gaussian
-                adaptive1 = cv2.adaptiveThreshold(enhanced, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 11, 2)
-                processing_stages['Adaptive_Gaussian'] = adaptive1
-                
-                # Adaptive threshold Mean
-                adaptive2 = cv2.adaptiveThreshold(enhanced, 255, cv2.ADAPTIVE_THRESH_MEAN_C, cv2.THRESH_BINARY, 11, 2)
-                processing_stages['Adaptive_Mean'] = adaptive2
-                
-                # Inverted versions (untuk handle white text on dark background)
-                processing_stages['Binary_Inv'] = cv2.bitwise_not(binary1)
-                processing_stages['Adaptive_Inv'] = cv2.bitwise_not(adaptive1)
-                
-                # Morphological closing untuk connect broken characters
-                kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (2,2))
-                morph = cv2.morphologyEx(binary1, cv2.MORPH_CLOSE, kernel)
-                processing_stages['Morphed'] = morph
-                
-            else:
-                # JIS: Preprocessing lebih simple
-                # Sharpening kernel untuk enhance edges
-                kernel = np.array([[-1,-1,-1], [-1, 9,-1],[-1,-1,-1]])
-                processing_stages['Sharpened'] = cv2.filter2D(gray, -1, kernel)
-                processing_stages['Grayscale'] = gray #Grayscale original
-                processing_stages['Inverted_Gray'] = cv2.bitwise_not(gray) #Inverted grayscale
-                # Binary adaptive threshold inverted
-                processed_frame_binary = cv2.adaptiveThreshold(gray, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY_INV, 11, 2)
-                processing_stages['Binary'] = processed_frame_binary
+            # Preprocessing: sama untuk DIN dan JIS
+            kernel = np.array([[-1,-1,-1], [-1, 9,-1],[-1,-1,-1]])
+            processing_stages['Sharpened'] = cv2.filter2D(gray, -1, kernel)
+            processing_stages['Grayscale'] = gray
+            processing_stages['Inverted_Gray'] = cv2.bitwise_not(gray)
+            processed_frame_binary = cv2.adaptiveThreshold(gray, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY_INV, 11, 2)
+            processing_stages['Binary'] = processed_frame_binary
 
-            all_results = [] #List untuk menyimpan semua hasil OCR dari berbagai preprocessing
-            all_results_with_bbox = []  # ADDED: List untuk menyimpan hasil dengan bounding box
+            all_results = []
+            all_results_with_bbox = []
             
-            # Pilih allowlist characters sesuai preset
-            if self.preset == "JIS":
-                allowlist_chars = ALLOWLIST_JIS  # Hanya karakter valid untuk JIS
+            # Pilih allowlist berdasarkan snapshot current_preset (BUKAN self.preset)
+            if current_preset == "JIS":
+                allowlist_chars = ALLOWLIST_JIS
             else:
-                allowlist_chars = ALLOWLIST_DIN  # Hanya karakter valid untuk DIN
+                allowlist_chars = ALLOWLIST_DIN
 
-            # Loop setiap preprocessing stage dan jalankan OCR
             for stage_name, processed_frame in processing_stages.items():
                 try:
-                    # Jalankan EasyOCR readtext dengan detail=1 untuk dapatkan bounding box
-                    # detail=1: return [bbox, text, confidence]
-                    # paragraph: group text dalam paragraf (untuk DIN)
-                    # min_size: minimum text size untuk detection
-                    # width_ths: threshold untuk text width
-                    # allowlist: karakter yang diperbolehkan
                     results = self.reader.readtext(
                         processed_frame, 
-                        detail=1,  # CHANGED: dari detail=0 ke detail=1 untuk dapat bbox
-                        paragraph=False if self.preset == "JIS" else True,
-                        min_size=10 if self.preset == "JIS" else 15,
-                        width_ths=0.7 if self.preset == "JIS" else 0.5,
+                        detail=1,
+                        paragraph=False,
+                        min_size=10,
+                        width_ths=0.7,
                         allowlist=allowlist_chars
                     )
                     
-                    # ADDED: Parse results dan simpan dengan bbox
                     for result in results:
                         bbox, text, confidence = result
-                        # Scale bbox back ke original frame size
                         scaled_bbox = [[int(x / scale_factor), int(y / scale_factor)] for x, y in bbox]
                         all_results.append(text)
                         all_results_with_bbox.append({'text': text, 'bbox': scaled_bbox, 'confidence': confidence})
                         
                 except Exception as e:
-                    # Print error tapi lanjut ke stage berikutnya
                     print(f"OCR error on {stage_name}: {e}")
                     continue
 
-            # Emit semua text yang terdeteksi untuk debugging (jika signal ada)
             if self.all_text_signal:
-                # Ambil unique results (hapus duplikat)
                 unique_results = list(set(all_results))
                 self.all_text_signal.emit(unique_results)
-            current_preset = self.preset #Simpan current preset untuk konsistensi
-            
-            # MATCHING LOGIC: berbeda untuk DIN vs JIS
+
+            # MATCHING LOGIC — gunakan current_preset (snapshot), bukan self.preset
+            best_match_text = None
+            best_match_score = 0.0
+
             if current_preset == "DIN":
-                # DIN: Cari match terbaik dari semua OCR results
-                best_match_text = None
-                best_match_score = 0.0
-                
-                # Loop setiap text hasil OCR
                 for result_data in all_results_with_bbox:
                     text = result_data['text']
                     bbox = result_data['bbox']
-                    
-                    # Apply OCR error correction
-                    text_fixed = fix_common_ocr_errors(text, self.preset)
-                    
-                    # Skip jika text terlalu pendek (< 4 char tanpa spasi)
-                    if len(text_fixed.replace(' ', '')) < 4:
+
+                    if len(text.replace(' ', '')) < 3:
                         continue
-                    
-                    # Cari best DIN match dengan fuzzy matching
-                    matched_type, score = self._find_best_din_match(text_fixed)
-                    
-                    # Update best match jika score lebih baik
+
+                    matched_type, score = self._find_best_din_match(text)
+
                     if matched_type and score > best_match_score:
                         best_match_score = score
                         best_match_text = matched_type
-                        best_match_bbox = bbox  # ADDED: Simpan bbox
-                
-                # Jika ada match dengan score > 0.8, gunakan itu
-                if best_match_text and best_match_score > 0.8:
+                        best_match_bbox = bbox
+
+                if best_match_text and best_match_score > 0.85:
                     best_match = best_match_text
-                    
+
             else:
-                # JIS: Cari match terbaik dari semua OCR results
-                best_match_text = None
-                best_match_score = 0.0
-                
-                # Loop setiap text hasil OCR
                 for result_data in all_results_with_bbox:
                     text = result_data['text']
                     bbox = result_data['bbox']
-                    
-                    # Skip jika text terlalu pendek (< 5 char tanpa spasi dan (S))
+
                     if len(text.replace(' ', '').replace('(S)', '')) < 5:
                         continue
-                    
-                    # Cari best JIS match dengan structural correction + fuzzy matching
+
                     matched_type, score = self._find_best_jis_match(text)
-                    
-                    # Update best match jika score lebih baik
+
                     if matched_type and score > best_match_score:
                         best_match_score = score
                         best_match_text = matched_type
-                        best_match_bbox = bbox  # ADDED: Simpan bbox
-                
-                # Jika ada match dengan score > 0.85, gunakan itu
+                        best_match_bbox = bbox
+
                 if best_match_text and best_match_score > 0.85:
                     best_match = best_match_text
             
             # Jika ada match yang ditemukan
             if best_match:
-                detected_code = best_match.strip() # Clean detected code
+                detected_code = best_match.strip()
                 
-                # ADDED: Simpan bbox dan code untuk preview dengan timestamp
                 self.last_detected_bbox = best_match_bbox
                 self.last_detected_code = detected_code
-                self.bbox_timestamp = time.time()  # ADDED: Set timestamp untuk auto-clear
+                self.bbox_timestamp = time.time()
                 
-                # Normalize DIN code (add proper spacing)
-                if self.preset == "DIN":
+                # Normalize menggunakan current_preset (snapshot)
+                if current_preset == "DIN":
                     detected_code = self._normalize_din_code(detected_code)
                 else:
-                    # JIS: hapus spasi
                     detected_code = detected_code.replace(' ', '')
 
-                timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S") #Get timestamp untuk database
-                detected_type = self._detect_code_type(detected_code) #Detect tipe code (JIS/DIN) untuk validasi
-                # Validasi apakah detected type match dengan preset
-                is_valid_type, error_message = self._validate_preset_match(detected_code, detected_type)
-                
-                # Jika tidak valid, emit error dan return
-                if not is_valid_type:
-                    self.code_detected_signal.emit(error_message)
+                timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                detected_type = self._detect_code_type(detected_code)
+
+                # Validasi: gunakan current_preset sebagai referensi, bukan self.preset
+                if detected_type is None:
+                    self.code_detected_signal.emit("Format kode tidak valid")
+                    if not is_static:
+                        self.scan_lock.release()
+                    return
+                if detected_type != current_preset:
+                    msg = "Pastikan foto anda adalah Type JIS" if current_preset == "JIS" else "Pastikan foto anda adalah Type DIN"
+                    self.code_detected_signal.emit(msg)
                     if not is_static:
                         self.scan_lock.release()
                     return
                 
-                # Tentukan status OK/Not OK berdasarkan match dengan target_label
-                if self.preset == "DIN":
-                    # DIN: normalize kedua code untuk comparison
-                    target_normalized = self._normalize_din_code(self.target_label)
+                # Status OK/Not OK — gunakan current_target_label (snapshot)
+                if current_preset == "DIN":
+                    target_normalized = self._normalize_din_code(current_target_label)
                     detected_normalized = self._normalize_din_code(detected_code)
                     status = "OK" if detected_normalized.upper() == target_normalized.upper() else "Not OK"
                 else:
-                    # JIS: exact string match
-                    status = "OK" if detected_code == self.target_label else "Not OK"
+                    status = "OK" if detected_code == current_target_label else "Not OK"
                 
-                # Set target_session: gunakan target_label jika ada, fallback ke detected_code
-                target_session = self.target_label if self.target_label else detected_code
+                target_session = current_target_label if current_target_label else detected_code
 
-                # Prevent duplicate detection (dalam 5 detik terakhir)
+                # Prevent duplicate detection dalam 5 detik
                 if not is_static:
-                    # Check apakah code ini sudah terdeteksi dalam 5 detik terakhir
                     if any(rec["Code"] == detected_code and 
                            (datetime.now() - datetime.strptime(rec["Time"], "%Y-%m-%d %H:%M:%S")).total_seconds() < 5
                            for rec in self.detected_codes):
@@ -928,35 +1011,31 @@ class DetectionLogic(threading.Thread):
             return f"PROCESS_ERROR: {e}"
 
     def _detect_code_type(self, code):
-        # Fungsi untuk detect tipe code (JIS/DIN) dari string
-        # Tujuan: Auto-detect apakah code termasuk JIS atau DIN format
-        # Parameter: code (string) - battery code
-        # Return: "JIS", "DIN", atau None jika tidak dikenali
-        code_normalized = code.replace(' ', '').upper() # Normalize code (hapus spasi, uppercase)
-        
-        # Check JIS pattern: 2-3 digit + huruf A-H + 2-3 digit + optional L/R + optional (S)
-        jis_pattern = r"\b\d{2,3}[A-H]\d{2,3}[LR]?(?:\(S\))?\b"
-        if re.match(jis_pattern, code_normalized):
+        """Detect tipe code: JIS atau DIN. Support semua format termasuk LN[0-6] [angka]A dan [angka]LN[0-6]."""
+        code_normalized = code.replace(' ', '').upper()
+
+        # JIS: 2-3 digit + huruf A-H + 2-3 digit + optional L/R + optional (S)
+        if re.match(r"^\d{2,3}[A-H]\d{2,3}[LR]?(?:\(S\))?$", code_normalized):
             return "JIS"
-        
-        # Check exact match dengan DIN_TYPES list
+
+        # DIN: exact match ke DIN_TYPES (paling reliable)
         for din_type in DIN_TYPES[1:]:
             if code_normalized == din_type.replace(' ', '').upper():
                 return "DIN"
-        
-        # Check DIN patterns dengan regex
+
+        # DIN: regex patterns untuk semua format
         din_patterns = [
-            r'^LBN\d$', #LBN + 1 digit
-            r'^LN\d\d{2,3}A(?:ISS)?$', #LN + digit + kapasitas + A + optional ISS
+            r'^LBN\d$',                  # LBN1, LBN2, LBN3
+            r'^LN[0-6]$',                 # LN0-LN6 tanpa kapasitas
+            r'^LN[0-6]\d{2,4}[A-Z]?$',  # LN4 776A, LN4 650A, LN6 1000A
+            r'^LN[0-6]\d{2,4}[A-Z]ISS$',# LN4 776A ISS
+            r'^\d{2,4}LN[0-6]$',         # Format reverse: 650LN4, 1000LN6
         ]
-        
-        # Loop setiap DIN pattern
         for pattern in din_patterns:
             if re.match(pattern, code_normalized):
                 return "DIN"
-    
-        return None # Return None jika tidak match dengan pattern manapun
 
+        return None
     def _validate_preset_match(self, detected_code, detected_type):
         # Fungsi untuk validasi apakah detected type match dengan preset
         # Tujuan: Prevent salah deteksi (user pilih JIS tapi scan DIN, atau sebaliknya)
