@@ -167,8 +167,10 @@ def fix_common_ocr_errors_din(text):
     # Pattern: prefix (LBN atau LN+digit) diikuti langsung angka
     text = re.sub(r'^(LBN)(\d)', r'\1 \2', text)         # LBN1 -> LBN 1
     text = re.sub(r'^(LN\d)(\d)', r'\1 \2', text)         # LN4776A -> LN4 776A
-    text = re.sub(r'^(\d+[A-Z]?)(LN\d)', r'\2 \1', text) # 450LN1 -> LN1 450 (reverse format)
-    text = re.sub(r'^(\d+[A-Z]?)(LBN\d)', r'\2 \1', text)
+    # REMOVED: Jangan balik reverse format (XXXLNx) ke forward (LNx XXX)
+    # Konsistensi dengan ocr.py yang treat reverse format as-is untuk match ke DIN_TYPES
+    # text = re.sub(r'^(\d+[A-Z]?)(LN\d)', r' ', text)  # DIHAPUS - konflik
+    # text = re.sub(r'^(\d+[A-Z]?)(LBN\d)', r' ', text) # DIHAPUS - konflik
     
     # Insert spasi sebelum ISS jika tidak ada spasi
     text = re.sub(r'([A-Z0-9])(ISS)$', r'\1 \2', text)

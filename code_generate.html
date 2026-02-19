@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Generator Code - Numeric Filenames</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+
+<style>
+    body {
+        font-family: Arial, sans-serif;
+        background: #f4f6f8;
+        padding: 20px;
+    }
+
+    h1, h3 {
+        text-align: center;
+    }
+
+    .controls {
+        background: white;
+        padding: 20px;
+        border-radius: 8px;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+        margin-bottom: 20px;
+        display: flex;
+        gap: 15px;
+        flex-wrap: wrap;
+        align-items: flex-end;
+    }
+
+    .input-group {
+        display: flex;
+        flex-direction: column;
+        gap: 5px;
+    }
+
+    .manual-section {
+        width: 100%;
+        border-top: 1px solid #ddd;
+        padding-top: 15px;
+        margin-top: 10px;
+    }
+
+    textarea {
+        width: 100%;
+        height: 60px;
+        padding: 10px;
+        border-radius: 5px;
+        border: 1px solid #ccc;
+        box-sizing: border-box;
+    }
+
+    input {
+        padding: 8px;
+        width: 100px;
+    }
+
+    button {
+        padding: 10px 15px;
+        cursor: pointer;
+        background: #007bff;
+        color: white;
+        border: none;
+        border-radius: 5px;
+        font-weight: bold;
+    }
+
+    button.secondary {
+        background: #28a745;
+    }
+
+    button:hover {
+        opacity: 0.9;
+    }
+
+    .grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+        gap: 15px;
+    }
+
+    .card {
+        background: white;
+        padding: 10px;
+        border-radius: 8px;
+        box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+        text-align: center;
+    }
+
+    canvas {
+        border: 1px solid #ddd;
+        margin-bottom: 10px;
+        max-width: 100%;
+        height: auto;
+    }
+</style>
+</head>
+<body>
+
+<h1>𒄆▀▄▀▄▀▄▀▄▀▄▀▄▀▄▀▄▀▄ D I N ── J I S ▀▄▀▄▀▄▀▄▀▄▀▄▀▄▀▄▀▄𒄆</h1>
+<h3>⚔ Deutsches Institut für Normung ⌖ Japanese Industrial Standard ⚔</h3>
+
+<div class="controls">
+    <div class="input-group">
+        <label>Lebar (px)</label>
+        <input type="number" id="width" value="400">
+    </div>
+    <div class="input-group">
+        <label>Tinggi (px)</label>
+        <input type="number" id="height" value="200">
+    </div>
+    <div class="input-group">
+        <label>Ukuran Font</label>
+        <input type="number" id="fontSize" value="30">
+    </div>
+    
+    <button onclick="processLabels(defaultLabels)">Generate Default</button>
+    <button class="secondary" onclick="downloadAll()">Download All (ZIP)</button>
+
+    <div class="manual-section">
+        <label><strong>Generate Manual (Pisahkan dengan koma):</strong></label>
+        <div style="display: flex; gap: 10px; margin-top: 10px;">
+            <textarea id="manualInput" placeholder="Contoh: CUSTOM 1, ABC 123, DIN-99"></textarea>
+            <button onclick="generateManual()">Generate Manual</button>
+        </div>
+    </div>
+</div>
+
+<div class="grid" id="labelContainer"></div>
+
+<script>
+const defaultLabels = [
+    "LBN 1", "LBN 2", "LBN 3",
+    "LN1", "LN2", "LN3", "LN4", "LN5", "LN6",
+    "LN4 776A ISS", "LN0 250A", "LN0 260A", "LN0 270A", "LN0 280A", "LN0 300A", "LN0 320A", "LN0 330A",
+    "LN0 335A", "LN0 350A", "LN0 360A", "LN0 380A", "LN0 400A",
+    "LN1 250A", "LN1 270A", "LN1 280A", "LN1 295A", "LN1 300A", "LN1 320A",
+    "LN1 330A", "LN1 350A", "LN1 360A", "LN1 380A", "LN1 400A", "LN1 420A",
+    "LN1 440A", "LN1 450A", "LN1 460A", "LN1 480A", "LN1 500A", "LN1 520A", "LN1 540A",
+    "LN2 345A", "LN2 350A", "LN2 355A", "LN2 360A", "LN2 380A", "LN2 400A",
+    "LN2 420A", "LN2 440A", "LN2 450A", "LN2 480A", "LN2 500A", "LN2 520A",
+    "LN2 540A", "LN2 550A", "LN2 560A", "LN2 580A", "LN2 600A", "LN2 620A",
+    "LN3 370A", "LN3 450A", "LN3 480A", "LN3 490A", "LN3 500A", "LN3 520A", "LN3 540A",
+    "LN3 550A", "LN3 560A", "LN3 580A", "LN3 600A", "LN3 620A", "LN3 650A",
+    "LN3 680A", "LN3 700A", "LN3 720A",
+    "LN4 390A", "LN4 550A", "LN4 580A", "LN4 600A", "LN4 620A", "LN4 650A",
+    "LN4 680A", "LN4 700A", "LN4 720A", "LN4 750A", "LN4 780A", "LN4 800A", "LN4 820A",
+    "LN5 650A", "LN5 680A", "LN5 700A", "LN5 720A", "LN5 750A", "LN5 780A",
+    "LN5 800A", "LN5 820A", "LN5 850A", "LN5 880A", "LN5 900A", "LN5 920A",
+    "LN6 750A", "LN6 780A", "LN6 800A", "LN6 820A", "LN6 850A", "LN6 880A",
+    "LN6 900A", "LN6 920A", "LN6 950A", "LN6 980A", "LN6 1000A", "LN6 1050A", "LN6 1100A",
+    "260LN0", "295LN1", "450LN1", "345LN2", "360LN2", "490LN3", "650LN4",
+    "250LN0", "270LN0", "280LN0", "300LN0", "320LN0", "330LN0",
+    "335LN0", "350LN0", "360LN0", "380LN0", "400LN0",
+    "250LN1", "270LN1", "280LN1", "295LN1", "300LN1", "320LN1",
+    "330LN1", "350LN1", "360LN1", "380LN1", "400LN1", "420LN1",
+    "440LN1", "450LN1", "460LN1", "480LN1", "500LN1", "520LN1", "540LN1",
+    "345LN2", "350LN2", "355LN2", "360LN2", "380LN2", "400LN2",
+    "420LN2", "440LN2", "450LN2", "480LN2", "500LN2", "520LN2",
+    "540LN2", "550LN2", "560LN2", "580LN2", "600LN2", "620LN2",
+    "370LN3", "450LN3", "480LN3", "490LN3", "500LN3", "520LN3", "540LN3",
+    "550LN3", "560LN3", "580LN3", "600LN3", "620LN3", "650LN3",
+    "680LN3", "700LN3", "720LN3",
+    "390LN4", "550LN4", "580LN4", "600LN4", "620LN4", "650LN4",
+    "680LN4", "700LN4", "720LN4", "750LN4", "780LN4", "800LN4", "820LN4",
+    "650LN5", "680LN5", "700LN5", "720LN5", "750LN5", "780LN5",
+    "800LN5", "820LN5", "850LN5", "880LN5", "900LN5", "920LN5",
+    "750LN6", "780LN6", "800LN6", "820LN6", "850LN6", "880LN6",
+    "900LN6", "920LN6", "950LN6", "980LN6", "1000LN6", "1050LN6", "1100LN6",
+];
+
+let activeLabels = [];
+
+function generateManual() {
+    const input = document.getElementById("manualInput").value;
+    if (!input.trim()) {
+        alert("Masukkan kode terlebih dahulu!");
+        return;
+    }
+    const customList = input.split(',').map(item => item.trim()).filter(item => item !== "");
+    processLabels(customList);
+}
+
+function processLabels(list) {
+    activeLabels = list; 
+    const container = document.getElementById("labelContainer");
+    container.innerHTML = "";
+
+    const width = parseInt(document.getElementById("width").value);
+    const height = parseInt(document.getElementById("height").value);
+    const fontSize = parseInt(document.getElementById("fontSize").value);
+
+    activeLabels.forEach((text, index) => {
+        const card = document.createElement("div");
+        card.className = "card";
+
+        const canvas = document.createElement("canvas");
+        canvas.id = "canvas-" + index;
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext("2d");
+
+        // Background
+        ctx.fillStyle = "#ffffff";
+        ctx.fillRect(0, 0, width, height);
+
+        // Text Style
+        ctx.fillStyle = "#000000";
+        ctx.font = `italic bold ${fontSize}px Arial`;
+        ctx.textAlign = "left";
+        ctx.textBaseline = "top";
+        ctx.fillText(text, 10, 10);
+
+        const btn = document.createElement("button");
+        // Gunakan nomor urut (index + 1) sebagai teks tombol dan nama file
+        const fileNumber = index + 1;
+        btn.innerText = "Download PNG (" + fileNumber + ")";
+        btn.style.width = "100%";
+        btn.onclick = () => {
+            const link = document.createElement("a");
+            link.download = fileNumber + ".png"; 
+            link.href = canvas.toDataURL();
+            link.click();
+        };
+
+        card.appendChild(canvas);
+        card.appendChild(btn);
+        container.appendChild(card);
+    });
+}
+
+function downloadAll() {
+    if (activeLabels.length === 0) {
+        alert("Tidak ada label untuk didownload. Generate dulu!");
+        return;
+    }
+
+    const zip = new JSZip();
+    const canvases = document.querySelectorAll("canvas");
+
+    canvases.forEach((canvas, index) => {
+        const imgData = canvas.toDataURL("image/png").split(',')[1];
+        // Nama file di dalam ZIP menggunakan urutan angka 1, 2, 3...
+        const fileName = (index + 1) + ".png"; 
+        zip.file(fileName, imgData, {base64: true});
+    });
+
+    zip.generateAsync({type:"blob"}).then(function(content) {
+        saveAs(content, "Generated_Labels_Numeric.zip");
+    });
+}
+</script>
+
+</body>
+</html>

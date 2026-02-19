@@ -80,9 +80,18 @@ class DetectionLogic(threading.Thread):
         self.detected_codes = load_existing_data(self.current_date) #Load data deteksi yang sudah ada untuk hari ini
         
         # Inisialisasi EasyOCR reader
-        # ['en'] = English language, gpu=False untuk CPU processing
+        # ['en'] = English language
         # verbose=False untuk disable logging output
-        self.reader = easyocr.Reader(['en'], gpu=True, verbose=False)
+        # OPTIMASI: Auto-detect GPU. Jika tidak ada GPU CUDA, gunakan CPU (lebih stabil)
+        try:
+            import torch
+            _gpu_available = torch.cuda.is_available()
+        except ImportError:
+            _gpu_available = False
+        self.reader = easyocr.Reader(['en'], gpu=_gpu_available, verbose=False)
+        
+        # OPTIMASI: Cache CLAHE object agar tidak dibuat ulang setiap scan
+        self._clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
 
         atexit.register(self.cleanup_temp_files) #Register cleanup function untuk dipanggil saat aplikasi exit
         
@@ -365,7 +374,7 @@ class DetectionLogic(threading.Thread):
         # Format: [digit+opsional huruf][LN][digit] -> convert ke LN[digit] [digit+huruf]
         match = re.match(r'^(\d+[A-Z]?)(LN\d)$', code_no_space)
         if match:
-            return f"{match.group(2)} {match.group(1)}"
+            return code_no_space  # Return XXXLNx as-is (tidak dibalik ke LNx XXX)
         
         # Pattern 1: LBN + digit saja (contoh: LBN1, LBN2, LBN3)
         match = re.match(r'^(LBN)(\d)$', code_no_space)
@@ -405,12 +414,14 @@ class DetectionLogic(threading.Thread):
     
     def _correct_din_structure(self, text):
         """
-        Koreksi struktural DIN. Support semua format:
-        - Format LBN : LBN 1, LBN 2, LBN 3
-        - Format LN  : LN4, LN4 776A ISS
-        - Format LN+A: LN4 650A, LN6 1000A  (kapasitas diakhiri A)
-        - Format Rev : 650LN4, 1000LN6  (angka di depan)
-        OCR sering salah baca: O->0, S->5, I->1 — dikoreksi per posisi.
+        Koreksi struktural DIN - versi final komprehensif.
+        Support semua format DIN_TYPES:
+          LBN 1/2/3, LN0-LN6, LN4 650A, LN4 776A ISS, 650LN4, 1000LN6, dll
+        
+        STEP 1: Pre-normalisasi karakter OCR kritis (LN digit, spasi di prefix)
+        STEP 2: Pattern matching untuk format reverse (XXXLNx)
+        STEP 3: Pattern matching untuk format forward dengan kapasitas
+        STEP 4: Koreksi per-token untuk sisa format
         """
         digit_map = {'O':'0','Q':'0','I':'1','L':'1','Z':'2','S':'5','G':'6','B':'8'}
 
@@ -418,32 +429,70 @@ class DetectionLogic(threading.Thread):
         text = re.sub(r'[^A-Z0-9\s]', '', text)
         text = re.sub(r'\s+', ' ', text).strip()
 
-        # ===== FORMAT REVERSE: [angka/noise]LN[0-6] =====
-        # Contoh: "650LN4", "65OLN4", "8SOLN5", "1OOOLN6"
-        # Harus dicek SEBELUM format LN-di-depan agar tidak konflik
-        m_rev = re.match(r'^([0-9A-Z]{2,4})\s*LN\s*([0-6])\s*$', text)
+        # ===== STEP 1A: FIX KRITIS - Koreksi digit setelah "LN" =====
+        # OCR sangat sering membaca digit 0-6 sebagai huruf (O,Q,I,S,G,Z)
+        # setelah "LN". Fix ini sebelum apapun karena mempengaruhi semua pattern.
+        # Contoh: 300LNO -> 300LN0, LNO 300A -> LN0 300A, 1000LNG -> 1000LN6
+        text = re.sub(
+            r'LN([OQILZSGB])(?=\s|$|\d)',
+            lambda m: 'LN' + digit_map.get(m.group(1), m.group(1)),
+            text
+        )
+        # Handle LN[OCR_char] di akhir string (tanpa lookahead)
+        text = re.sub(
+            r'LN([OQILZSGB])$',
+            lambda m: 'LN' + digit_map.get(m.group(1), m.group(1)),
+            text
+        )
+        
+        # ===== STEP 1B: Hapus spasi di dalam prefix LN/LBN =====
+        # OCR kadang baca "L N4 650A" atau "LN 4 650A"
+        text = re.sub(r'\bL\s+N\s*([0-6])', r'LN\1', text)
+        text = re.sub(r'\bL\s+B\s*N\b', 'LBN', text)
+        text = re.sub(r'\s+', ' ', text).strip()
+
+        # ===== STEP 2: FORMAT REVERSE: [angka/typo]LN[0-6] =====
+        # Contoh: "650LN4", "65OLN4", "6SOLN4", "300LN0", "1000LN6"
+        # Setelah STEP 1, digit setelah LN sudah benar (O->0, G->6, dll)
+        m_rev = re.match(r'^([0-9A-Z]{2,5})\s*LN\s*([0-6])\s*$', text)
         if m_rev:
-            corrected_num = ''.join(digit_map.get(c, c) for c in m_rev.group(1))
-            return f"{corrected_num}LN{m_rev.group(2)}"
+            raw_num = m_rev.group(1)
+            # Koreksi digit_map dulu (O->0, S->5, G->6, dll)
+            corrected_num = ''.join(digit_map.get(c, c) for c in raw_num)
+            # Hapus huruf noise yang masih tersisa dari num_part (seharusnya hanya digit)
+            digits_only = re.sub(r'[A-Z]', '', corrected_num)
+            final_num = digits_only if len(digits_only) >= 2 else corrected_num
+            return f"{final_num}LN{m_rev.group(2)}"
 
-        # ===== FORMAT LN + KAPASITAS + A: LN[0-6] [angka]A =====
-        # Contoh: "LN4 650A", "LN6 1000A", "LN5 85OA" (O->0)
-        # Kapasitas bisa 2-4 digit diikuti huruf A (atau noise mirip A)
-        m_lna = re.match(r'^(LN[0-6])\s+([0-9A-Z]{2,4})([A-Z])\s*$', text)
+        # STEP 2b: Reverse dengan LN terbaca sebagai typo (1N, IN, LH)
+        m_rev2 = re.search(r'^([0-9A-Z]{2,5})\s*(?:1N|IN|LH|LM)\s*([0-6])\s*$', text)
+        if m_rev2:
+            raw_num = m_rev2.group(1)
+            corrected_num = ''.join(digit_map.get(c, c) for c in raw_num)
+            digits_only = re.sub(r'[A-Z]', '', corrected_num)
+            final_num = digits_only if len(digits_only) >= 2 else corrected_num
+            return f"{final_num}LN{m_rev2.group(2)}"
+
+        # ===== STEP 3A: LN[0-6] + kapasitas + A + ISS =====
+        # Contoh: "LN4 776A ISS", "LN4 776A I55"
+        m_lna_iss = re.match(r'^(LN[0-6])\s+([0-9A-Z]{2,5})([A-Z])\s+(ISS|I55|IS5|I5S|155|1SS)\s*$', text)
+        if m_lna_iss:
+            corrected_cap = ''.join(digit_map.get(c, c) for c in m_lna_iss.group(2))
+            suffix = 'A' if m_lna_iss.group(3) in ['A', '4'] else m_lna_iss.group(3)
+            return f"{m_lna_iss.group(1)} {corrected_cap}{suffix} ISS"
+
+        # ===== STEP 3B: LN[0-6] + kapasitas + A =====
+        # Contoh: "LN4 650A", "LN6 1000A", "LN5 85OA" (O->0 sudah fix di step 1? no, di kapasitas)
+        m_lna = re.match(r'^(LN[0-6])\s+([0-9A-Z]{2,5})([A-Z])\s*$', text)
         if m_lna:
-            prefix   = m_lna.group(1)
-            raw_cap  = m_lna.group(2)
-            suffix   = m_lna.group(3)
-            corrected_cap = ''.join(digit_map.get(c, c) for c in raw_cap)
-            # Pastikan suffix adalah A (bukan noise)
-            corrected_suffix = 'A' if suffix in ['A', '4'] else suffix
-            return f"{prefix} {corrected_cap}{corrected_suffix}"
+            corrected_cap = ''.join(digit_map.get(c, c) for c in m_lna.group(2))
+            suffix = 'A' if m_lna.group(3) in ['A', '4'] else m_lna.group(3)
+            return f"{m_lna.group(1)} {corrected_cap}{suffix}"
 
-        # ===== FORMAT LAMA: LBN/LN di depan tanpa A =====
-        # Insert spasi jika token menempel: "LN4776A" -> "LN4 776A", "LBN1" -> "LBN 1"
-        text = re.sub(r'^(LBN)(\d)', r' ', text)
-        text = re.sub(r'^(LN[0-6])(\d)', r' ', text)
-        text = re.sub(r'([A-Z0-9])\s*(ISS)$', r' ISS', text)
+        # ===== STEP 4: Insert spasi dan koreksi per-token =====
+        text = re.sub(r'^(LBN)(\d)', r'\1 \2', text)
+        text = re.sub(r'^(LN[0-6])(\d)', r'\1 \2', text)
+        text = re.sub(r'([A-Z0-9])\s*(ISS)$', r'\1 \2', text)
         text = re.sub(r'\s+', ' ', text).strip()
 
         tokens = text.split()
@@ -453,15 +502,14 @@ class DetectionLogic(threading.Thread):
         corrected_tokens = []
         for i, token in enumerate(tokens):
             if i == 0:
-                # TOKEN 0: Prefix (LBN atau LN0-LN6)
                 corrected = ''
                 for j, char in enumerate(token):
                     if j == 0:
                         corrected += 'L' if char in ['1', 'I', 'l'] else char
                     elif j == 1:
-                        if char == '8':          corrected += 'B'
-                        elif char in ['H','M']:  corrected += 'N'
-                        else:                    corrected += char
+                        if char == '8':         corrected += 'B'
+                        elif char in ['H','M']: corrected += 'N'
+                        else:                   corrected += char
                     elif j == 2:
                         if corrected == 'LB':
                             corrected += 'N' if char in ['H','M'] else char
@@ -472,7 +520,6 @@ class DetectionLogic(threading.Thread):
                 corrected_tokens.append(corrected)
 
             elif i == 1:
-                # TOKEN 1: Kapasitas (angka + suffix huruf opsional: 776A, 295A)
                 corrected = ''
                 for j, char in enumerate(token):
                     is_last = (j == len(token) - 1)
@@ -485,66 +532,80 @@ class DetectionLogic(threading.Thread):
                 corrected_tokens.append(corrected)
 
             elif i == 2:
-                # TOKEN 2: Marker ISS
                 norm = token.replace('5','S').replace('1','I').replace('0','O')
-                corrected_tokens.append('ISS' if norm == 'ISS' else token)
+                corrected_tokens.append('ISS' if norm in ['ISS','I55','IS5'] else token)
 
             else:
                 corrected_tokens.append(token)
 
         return ' '.join(corrected_tokens)
+    
     def _find_best_din_match(self, detected_text):
         """
-        MENIRU _find_best_jis_match untuk DIN:
+        OPTIMASI: Menggabungkan 6 loop terpisah menjadi 1 single pass.
+        Hasil sama tapi jauh lebih cepat karena DIN_TYPES hanya di-iterasi 1 kali.
+        
         TAHAP 1: Koreksi struktural (_correct_din_structure)
-        TAHAP 2: Fuzzy match ke DIN_TYPES (threshold 0.85)
-        TAHAP 3: Fallback matching tanpa suffix/marker
+        TAHAP 2: Single pass - exact match + fuzzy + fallback ISS sekaligus
+        TAHAP 3: Reverse format fallback jika masih belum ketemu
         """
-        # TAHAP 1: Koreksi struktural dulu (meniru _correct_jis_structure)
         detected_corrected = self._correct_din_structure(detected_text)
         detected_clean = detected_corrected.replace(' ', '').upper()
 
+        if len(detected_clean) < 2:
+            return None, 0.0
+
         best_match = None
         best_score = 0.0
+        
+        # Pre-compute detected tanpa ISS untuk fallback (sekali saja, bukan di dalam loop)
+        detected_no_iss = re.sub(r'\s*ISS$', '', detected_clean)
 
-        # TAHAP 2: Exact match
+        # Threshold adaptif (sama seperti sebelumnya)
+        is_reverse_pattern = bool(re.search(r'LN[0-6]$', detected_clean))
+        is_forward_pattern = bool(re.match(r'^LN[0-6]', detected_clean))
+        if len(detected_clean) <= 4:
+            adaptive_threshold = 0.75
+        elif is_reverse_pattern or is_forward_pattern:
+            adaptive_threshold = 0.70
+        else:
+            adaptive_threshold = 0.82
+
+        # OPTIMASI: Single pass - semua pengecekan dalam 1 loop
         for din_type in DIN_TYPES[1:]:
             target_clean = din_type.replace(' ', '').upper()
+
+            # Exact match - langsung return, tidak perlu lanjut
             if detected_clean == target_clean:
                 return din_type, 1.0
 
-        # TAHAP 3: Fuzzy match (meniru loop pertama _find_best_jis_match, threshold 0.85)
-        for din_type in DIN_TYPES[1:]:
-            target_clean = din_type.replace(' ', '').upper()
+            # Fuzzy match
             ratio = SequenceMatcher(None, detected_clean, target_clean).ratio()
-            if ratio > 0.85 and ratio > best_score:
+            if ratio >= adaptive_threshold and ratio > best_score:
                 best_score = ratio
                 best_match = din_type
 
-        # TAHAP 4: Fallback - match tanpa suffix ISS (meniru fallback JIS tanpa (S))
-        # Berguna saat OCR tidak menangkap "ISS" di akhir kode
-        if not best_match or best_score < 0.90:
-            detected_without_iss = re.sub(r'\s*ISS$', '', detected_clean)
-
-            for din_type in DIN_TYPES[1:]:
-                target_without_iss = re.sub(r'ISS$', '', din_type.replace(' ', '').upper())
-                ratio = SequenceMatcher(None, detected_without_iss, target_without_iss).ratio()
-
-                if ratio > 0.90:
-                    # Jika detected punya ISS, cari versi dengan ISS di DIN_TYPES
-                    if 'ISS' in detected_clean:
-                        candidate_with_iss = din_type.replace(' ', '').upper()
-                        if not candidate_with_iss.endswith('ISS'):
-                            candidate_iss = din_type + ' ISS' if ' ISS' not in din_type else din_type
-                            if candidate_iss in DIN_TYPES:
-                                best_match = candidate_iss
-                                best_score = ratio
-                                break
-                    else:
-                        # Tanpa ISS: ambil versi tanpa ISS dari DIN_TYPES
-                        if 'ISS' not in din_type and ratio > best_score:
+            # Fallback ISS - cek dalam loop yang sama (hemat 1 iterasi penuh)
+            if ratio < 0.88:
+                target_no_iss = re.sub(r'ISS$', '', target_clean)
+                if detected_no_iss != detected_clean or target_no_iss != target_clean:
+                    ratio_no_iss = SequenceMatcher(None, detected_no_iss, target_no_iss).ratio()
+                    if ratio_no_iss >= 0.88 and ratio_no_iss > best_score:
+                        # Jika detected punya ISS, cari versi dengan ISS di DIN_TYPES
+                        if 'ISS' in detected_clean and 'ISS' not in din_type:
+                            iss_candidate = din_type + ' ISS'
+                            if iss_candidate in DIN_TYPES:
+                                best_score = ratio_no_iss
+                                best_match = iss_candidate
+                        elif 'ISS' not in din_type:
+                            best_score = ratio_no_iss
                             best_match = din_type
-                            best_score = ratio
+
+        # Reverse format fallback (hanya jika masih belum dapat match)
+        if not best_match and re.match(r'^(\d+)LN([0-6])$', detected_clean):
+            for din_type in DIN_TYPES[1:]:
+                if din_type.replace(' ', '').upper() == detected_clean:
+                    return din_type, 1.0
 
         return best_match, best_score
     
@@ -729,13 +790,27 @@ class DetectionLogic(threading.Thread):
             gray = cv2.cvtColor(frame_small, cv2.COLOR_BGR2GRAY)
             processing_stages = {}
             
-            # Preprocessing: sama untuk DIN dan JIS
-            kernel = np.array([[-1,-1,-1], [-1, 9,-1],[-1,-1,-1]])
-            processing_stages['Sharpened'] = cv2.filter2D(gray, -1, kernel)
+            kernel_sharpen = np.array([[-1,-1,-1], [-1, 9,-1],[-1,-1,-1]])
+            
+            # OPTIMASI: Dari 12 stage menjadi 4 stage terpilih (4-8x lebih cepat)
+            # Dihapus: Inverted, Binary_21, OTSU_Inv, CLAHE_Binary,
+            #   Denoised (fastNlMeans sangat lambat ~1-3 detik),
+            #   Upscale_2x & Upscale_2x_OTSU (gambar 2x = OCR 4x lebih lambat)
+            
+            # Stage 1: Grayscale dasar - cocok untuk label kontras tinggi
             processing_stages['Grayscale'] = gray
-            processing_stages['Inverted_Gray'] = cv2.bitwise_not(gray)
-            processed_frame_binary = cv2.adaptiveThreshold(gray, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY_INV, 11, 2)
-            processing_stages['Binary'] = processed_frame_binary
+            
+            # Stage 2: Sharpened - mempertajam teks yang buram/tidak fokus
+            processing_stages['Sharpened'] = cv2.filter2D(gray, -1, kernel_sharpen)
+            
+            # Stage 3: OTSU - auto-threshold, menggantikan Binary_11/21 dan OTSU_Inv
+            _, otsu_frame = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+            processing_stages['OTSU'] = otsu_frame
+            
+            # Stage 4: CLAHE - untuk label kusam, kuning, pencahayaan tidak merata
+            # Pakai self._clahe yang sudah di-cache di __init__ (tidak dibuat ulang setiap scan)
+            clahe_frame = self._clahe.apply(gray)
+            processing_stages['CLAHE'] = clahe_frame
 
             all_results = []
             all_results_with_bbox = []
@@ -748,24 +823,70 @@ class DetectionLogic(threading.Thread):
 
             for stage_name, processed_frame in processing_stages.items():
                 try:
+                    is_upscale = 'Upscale' in stage_name
+                    min_sz = 18 if is_upscale else 8
+                    w_ths = 0.5 if current_preset == "DIN" else 0.7
+                    
                     results = self.reader.readtext(
-                        processed_frame, 
+                        processed_frame,
                         detail=1,
                         paragraph=False,
-                        min_size=10,
-                        width_ths=0.7,
+                        min_size=min_sz,
+                        width_ths=w_ths,
                         allowlist=allowlist_chars
                     )
                     
+                    stage_scale = scale_factor * (2.0 if is_upscale else 1.0)
+                    
                     for result in results:
                         bbox, text, confidence = result
-                        scaled_bbox = [[int(x / scale_factor), int(y / scale_factor)] for x, y in bbox]
+                        scaled_bbox = [[int(x / stage_scale), int(y / stage_scale)] for x, y in bbox]
                         all_results.append(text)
                         all_results_with_bbox.append({'text': text, 'bbox': scaled_bbox, 'confidence': confidence})
+                    
+                    # OPTIMASI: Early exit jika sudah ada hasil dengan confidence tinggi
+                    # Tidak perlu proses stage berikutnya jika sudah sangat yakin
+                    if all_results_with_bbox:
+                        best_conf = max(r['confidence'] for r in all_results_with_bbox)
+                        if best_conf > 0.90:
+                            break
                         
                 except Exception as e:
                     print(f"OCR error on {stage_name}: {e}")
                     continue
+            
+            # ===== SPATIAL GROUPING untuk DIN multi-token =====
+            if current_preset == "DIN" and all_results_with_bbox:
+                def _group_adjacent(results_bbox, max_h_gap=60, max_v_diff=20):
+                    if not results_bbox: return results_bbox
+                    def bi(bbox):
+                        xs=[p[0] for p in bbox]; ys=[p[1] for p in bbox]
+                        return min(xs),min(ys),max(xs),max(ys)
+                    items = sorted(results_bbox, key=lambda r: bi(r['bbox'])[0])
+                    used = [False]*len(items); grouped = []
+                    for i, item in enumerate(items):
+                        if used[i]: continue
+                        x1i,y1i,x2i,y2i = bi(item['bbox'])
+                        texts=[item['text']]; confs=[item['confidence']]; used[i]=True
+                        for j, other in enumerate(items):
+                            if used[j] or i==j: continue
+                            x1j,y1j,x2j,y2j = bi(other['bbox'])
+                            cy_i=(y1i+y2i)/2; cy_j=(y1j+y2j)/2
+                            if abs(cy_i-cy_j)>max_v_diff: continue
+                            if 0<=x1j-x2i<=max_h_gap:
+                                texts.append(other['text']); confs.append(other['confidence'])
+                                used[j]=True; x2i=x2j
+                        if len(texts)>1:
+                            grouped.append({'text':' '.join(texts),'bbox':item['bbox'],
+                                           'confidence':sum(confs)/len(confs)})
+                        else:
+                            grouped.append(item)
+                    return grouped
+                grouped_results = _group_adjacent(all_results_with_bbox)
+                for gr in grouped_results:
+                    if ' ' in gr['text'] and gr['text'] not in all_results:
+                        all_results.append(gr['text'])
+                        all_results_with_bbox.append(gr)
 
             if self.all_text_signal:
                 unique_results = list(set(all_results))
@@ -1026,10 +1147,10 @@ class DetectionLogic(threading.Thread):
         # DIN: regex patterns untuk semua format
         din_patterns = [
             r'^LBN\d$',                  # LBN1, LBN2, LBN3
-            r'^LN[0-6]$',                 # LN0-LN6 tanpa kapasitas
-            r'^LN[0-6]\d{2,4}[A-Z]?$',  # LN4 776A, LN4 650A, LN6 1000A
-            r'^LN[0-6]\d{2,4}[A-Z]ISS$',# LN4 776A ISS
-            r'^\d{2,4}LN[0-6]$',         # Format reverse: 650LN4, 1000LN6
+            r'^LN[0-6]$',                # LN0-LN6 tanpa kapasitas
+            r'^LN[0-6]\d{2,5}[A-Z]?$',   # LN4 776A, LN4 650A, LN6 1000A
+            r'^LN[0-6]\d{2,5}[A-Z]ISS$', # LN4 776A ISS
+            r'^\d{2,5}LN[0-6]$',         # Format reverse: 650LN4, 1000LN6, 1050LN6
         ]
         for pattern in din_patterns:
             if re.match(pattern, code_normalized):

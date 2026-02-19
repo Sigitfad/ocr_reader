@@ -102,12 +102,12 @@ JIS_TYPES = [
     "26A17", "26A17L", "26A17R", "26A17L(S)", "26A17R(S)",
     "26A19", "26A19L", "26A19R", "26A19L(S)", "26A19R(S)",
     "28A19", "28A19L", "28A19R", "28A19L(S)", "28A19R(S)",
-    "32A19", "32A19L", "32A19R", "32A19L(S)", "32A19R(S)",
     "26B17", "26B17L", "26B17R", "26B17L(S)", "26B17R(S)",
     "28B17", "28B17L", "28B17R", "28B17L(S)", "28B17R(S)",
     "28B19", "28B19L", "28B19R", "28B19L(S)", "28B19R(S)",
     "28B20", "28B20L", "28B20R", "28B20L(S)", "28B20R(S)",
     "30C24", "30C24L", "30C24R", "30C24L(S)", "30C24R(S)",
+    "32A19", "32A19L", "32A19R", "32A19L(S)", "32A19R(S)",
     "32B24", "32B24L", "32B24R", "32B24L(S)", "32B24R(S)",
     "32B20", "32B20L", "32B20R", "32B20L(S)", "32B20R(S)",
     "32C24", "32C24L", "32C24R", "32C24L(S)", "32C24R(S)",
@@ -169,6 +169,7 @@ JIS_TYPES = [
     "180G51", "180G51L", "180G51R", "180G51L(S)", "180G51R(S)",
     "195G51", "195G51L", "195G51R", "195G51L(S)", "195G51R(S)",
     "190H52", "190H52L", "190H52R", "190H52L(S)", "190H52R(S)",
+    "195H52", "195H52L", "195H52R", "195H52L(S)", "195H52R(S)",
     "245H52", "245H52L", "245H52R", "245H52L(S)", "245H52R(S)",
 ]
 
@@ -180,77 +181,48 @@ JIS_TYPES = [
 #Contoh: LN4 776A ISS = LN4 prefix, 776A capacity rating, ISS marker
 DIN_TYPES = [
     "Select Label . . .",  #Placeholder - tidak valid untuk scanning
-
-    # ===== Format Lama: LBN dan LN tanpa/dengan kapasitas =====
     "LBN 1", "LBN 2", "LBN 3",
-    "LN1", "LN2", "LN3", "LN4",
-    "LN0 260A", "260LN0",
-    "LN1 295A", "295LN1", "LN1 450A", "450LN1",
-    "LN2 345A", "345LN2", "LN2 360A", "360LN2",
-    "LN3 490A", "490LN3",
-    "LN4 650A", "650LN4", "LN4 776A ISS",
+    "LN1", "LN2", "LN3", "LN4", "LN5", "LN6",
+    "LN4 776A ISS",
 
-    # ===== Format Baru: [Kapasitas]LN[0] =====
-    "250LN0", "270LN0", "280LN0", "300LN0", "320LN0", "330LN0",
-    "335LN0", "350LN0", "360LN0", "380LN0", "400LN0",
-
-    # ===== Format Baru: [Kapasitas]LN[1] =====
-    "250LN1", "270LN1", "280LN1", "295LN1", "300LN1", "320LN1",
-    "330LN1", "350LN1", "360LN1", "380LN1", "400LN1", "420LN1",
-    "440LN1", "450LN1", "460LN1", "480LN1", "500LN1", "520LN1", "540LN1",
-
-    # ===== Format Baru: [Kapasitas]LN[2] =====
-    "345LN2", "350LN2", "355LN2", "360LN2", "380LN2", "400LN2",
-    "420LN2", "440LN2", "450LN2", "480LN2", "500LN2", "520LN2",
-    "540LN2", "550LN2", "560LN2", "580LN2", "600LN2", "620LN2",
-
-    # ===== Format Baru: [Kapasitas]LN[3] =====
-    "450LN3", "480LN3", "490LN3", "500LN3", "520LN3", "540LN3",
-    "550LN3", "560LN3", "580LN3", "600LN3", "620LN3", "650LN3",
-    "680LN3", "700LN3", "720LN3",
-
-    # ===== Format Baru: [Kapasitas]LN[4] =====
-    "390LN4", "550LN4", "580LN4", "600LN4", "620LN4", "650LN4",
-    "680LN4", "700LN4", "720LN4", "750LN4", "780LN4", "800LN4", "820LN4",
-
-    # ===== Format Baru: [Kapasitas]LN[5] =====
-    "650LN5", "680LN5", "700LN5", "720LN5", "750LN5", "780LN5",
-    "800LN5", "820LN5", "850LN5", "880LN5", "900LN5", "920LN5",
-
-    # ===== Format Baru: [Kapasitas]LN[6] =====
-    "750LN6", "780LN6", "800LN6", "820LN6", "850LN6", "880LN6",
-    "900LN6", "920LN6", "950LN6", "980LN6", "1000LN6", "1050LN6", "1100LN6",
-
-    # ===== Format Baru: LN[0] [Kapasitas]A =====
-    "LN0 250A", "LN0 270A", "LN0 280A", "LN0 300A", "LN0 320A", "LN0 330A",
+    #Daftar DIN dengan LN didepan
+    "LN0 250A", "LN0 260A", "LN0 270A", "LN0 280A", "LN0 300A", "LN0 320A", "LN0 330A",
     "LN0 335A", "LN0 350A", "LN0 360A", "LN0 380A", "LN0 400A",
-
-    # ===== Format Baru: LN[1] [Kapasitas]A =====
     "LN1 250A", "LN1 270A", "LN1 280A", "LN1 295A", "LN1 300A", "LN1 320A",
     "LN1 330A", "LN1 350A", "LN1 360A", "LN1 380A", "LN1 400A", "LN1 420A",
     "LN1 440A", "LN1 450A", "LN1 460A", "LN1 480A", "LN1 500A", "LN1 520A", "LN1 540A",
-
-    # ===== Format Baru: LN[2] [Kapasitas]A =====
     "LN2 345A", "LN2 350A", "LN2 355A", "LN2 360A", "LN2 380A", "LN2 400A",
     "LN2 420A", "LN2 440A", "LN2 450A", "LN2 480A", "LN2 500A", "LN2 520A",
     "LN2 540A", "LN2 550A", "LN2 560A", "LN2 580A", "LN2 600A", "LN2 620A",
-
-    # ===== Format Baru: LN[3] [Kapasitas]A =====
-    "LN3 450A", "LN3 480A", "LN3 490A", "LN3 500A", "LN3 520A", "LN3 540A",
+    "LN3 370A", "LN3 450A", "LN3 480A", "LN3 490A", "LN3 500A", "LN3 520A", "LN3 540A",
     "LN3 550A", "LN3 560A", "LN3 580A", "LN3 600A", "LN3 620A", "LN3 650A",
     "LN3 680A", "LN3 700A", "LN3 720A",
-
-    # ===== Format Baru: LN[4] [Kapasitas]A =====
     "LN4 390A", "LN4 550A", "LN4 580A", "LN4 600A", "LN4 620A", "LN4 650A",
     "LN4 680A", "LN4 700A", "LN4 720A", "LN4 750A", "LN4 780A", "LN4 800A", "LN4 820A",
-
-    # ===== Format Baru: LN[5] [Kapasitas]A =====
     "LN5 650A", "LN5 680A", "LN5 700A", "LN5 720A", "LN5 750A", "LN5 780A",
     "LN5 800A", "LN5 820A", "LN5 850A", "LN5 880A", "LN5 900A", "LN5 920A",
-
-    # ===== Format Baru: LN[6] [Kapasitas]A =====
     "LN6 750A", "LN6 780A", "LN6 800A", "LN6 820A", "LN6 850A", "LN6 880A",
     "LN6 900A", "LN6 920A", "LN6 950A", "LN6 980A", "LN6 1000A", "LN6 1050A", "LN6 1100A",
+
+    #Daftar DIN dengan LN dibelakang
+    "260LN0", "295LN1", "450LN1", "345LN2", "360LN2", "490LN3", "650LN4",
+    "250LN0", "270LN0", "280LN0", "300LN0", "320LN0", "330LN0",
+    "335LN0", "350LN0", "360LN0", "380LN0", "400LN0",
+    "250LN1", "270LN1", "280LN1", "295LN1", "300LN1", "320LN1",
+    "330LN1", "350LN1", "360LN1", "380LN1", "400LN1", "420LN1",
+    "440LN1", "450LN1", "460LN1", "480LN1", "500LN1", "520LN1", "540LN1",
+    "345LN2", "350LN2", "355LN2", "360LN2", "380LN2", "400LN2",
+    "420LN2", "440LN2", "450LN2", "480LN2", "500LN2", "520LN2",
+    "540LN2", "550LN2", "560LN2", "580LN2", "600LN2", "620LN2",
+    "370LN3", "450LN3", "480LN3", "490LN3", "500LN3", "520LN3", "540LN3",
+    "550LN3", "560LN3", "580LN3", "600LN3", "620LN3", "650LN3",
+    "680LN3", "700LN3", "720LN3",
+    "390LN4", "550LN4", "580LN4", "600LN4", "620LN4", "650LN4",
+    "680LN4", "700LN4", "720LN4", "750LN4", "780LN4", "800LN4", "820LN4",
+    "650LN5", "680LN5", "700LN5", "720LN5", "750LN5", "780LN5",
+    "800LN5", "820LN5", "850LN5", "880LN5", "900LN5", "920LN5",
+    "750LN6", "780LN6", "800LN6", "820LN6", "850LN6", "880LN6",
+    "900LN6", "920LN6", "950LN6", "980LN6", "1000LN6", "1050LN6", "1100LN6",
 ]
 
 #MONTHS

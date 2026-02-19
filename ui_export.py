@@ -148,9 +148,10 @@ def create_export_dialog(parent, logic, preset_combo, jis_type_combo):
     tipe_row.addWidget(export_preset_combo)
     preset_layout.addLayout(tipe_row)
     
-    # Checkbox Pilih Label
+    # Checkbox Pilih Label - default otomatis terceklis
     export_label_filter_enabled = QCheckBox("Pilih Label")
     export_label_filter_enabled.setStyleSheet("font-size: 12px;")
+    export_label_filter_enabled.setChecked(True)
     preset_layout.addWidget(export_label_filter_enabled)
     
     # Label dropdown
@@ -176,7 +177,7 @@ def create_export_dialog(parent, logic, preset_combo, jis_type_combo):
         export_completer.setCaseSensitivity(Qt.CaseSensitivity.CaseInsensitive)
     
     export_label_type_combo.setMaxVisibleItems(15)
-    export_label_type_combo.setEnabled(False)
+    export_label_type_combo.setEnabled(True)  # Default enabled karena checkbox sudah terceklis
     
     current_session = jis_type_combo.currentText()
     if current_session and current_session != "Select Label . . .":
