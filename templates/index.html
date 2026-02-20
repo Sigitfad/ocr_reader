@@ -1,0 +1,825 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>QC Battery Inspector</title>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.2/css/bootstrap.min.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-icons/1.11.3/font/bootstrap-icons.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.min.js"></script>
+
+<style>
+/* ── Design Tokens ─────────────────────────────── */
+:root {
+  --bg:        #f5f6f8;
+  --surface:   #ffffff;
+  --surface-2: #f0f2f5;
+
+  --border:    #e2e5ea;
+  --border-2:  #d0d4dc;
+
+  --text-1:    #1a1d23;
+  --text-2:    #5a6275;
+  --text-3:    #9aa0b0;
+
+  --accent:    #2563eb;
+  --accent-bg: #eff4ff;
+
+  --green:     #16a34a;
+  --green-bg:  #f0fdf4;
+  --red:       #dc2626;
+  --red-bg:    #fef2f2;
+  --amber:     #d97706;
+
+  --font:      'DM Sans', system-ui, sans-serif;
+  --mono:      'DM Mono', monospace;
+  --r:         8px;
+  --r-sm:      5px;
+  --shadow:    0 1px 3px rgba(0,0,0,.06), 0 1px 2px rgba(0,0,0,.04);
+  --shadow-md: 0 4px 16px rgba(0,0,0,.08);
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { height: 100%; overflow: hidden; font-family: var(--font); font-size: 14px; color: var(--text-1); background: var(--bg); }
+
+::-webkit-scrollbar { width: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border-2); border-radius: 99px; }
+
+/* ── TOPBAR ─────────────────────────────────────── */
+#topbar {
+  height: 54px; background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 0 22px; flex-shrink: 0;
+  box-shadow: var(--shadow);
+}
+.brand { display: flex; align-items: center; gap: 10px; }
+.brand-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--accent); }
+.brand-name { font-size: 16px; font-weight: 600; letter-spacing: .3px; color: var(--text-1); }
+.brand-sep { color: var(--border-2); }
+.brand-sub { font-size: 13px; font-weight: 400; color: var(--text-3); }
+
+.top-right { display: flex; align-items: center; gap: 14px; }
+#clock { font-family: var(--mono); font-size: 13px; color: var(--text-2); }
+#cam-badge {
+  display: flex; align-items: center; gap: 6px;
+  padding: 5px 12px; border-radius: 99px;
+  background: var(--surface-2); border: 1px solid var(--border);
+  font-size: 12px; font-weight: 500; color: var(--text-3);
+  transition: all .3s;
+}
+#cam-badge .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--border-2); transition: all .3s; }
+#cam-badge.on { background: var(--green-bg); border-color: #bbf7d0; color: var(--green); }
+#cam-badge.on .dot { background: var(--green); animation: pulse 1.6s infinite; }
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.3} }
+
+/* ── LAYOUT ─────────────────────────────────────── */
+#app { display: flex; height: calc(100vh - 54px); overflow: hidden; }
+
+/* ── SIDE PANELS ────────────────────────────────── */
+.panel {
+  background: var(--surface);
+  border-right: 1px solid var(--border);
+  display: flex; flex-direction: column;
+  padding: 18px 16px; gap: 14px;
+  overflow-y: auto; flex-shrink: 0;
+}
+#left-panel  { width: 310px; }
+#right-panel { width: 360px; border-right: none; border-left: 1px solid var(--border); }
+
+/* ── SECTION LABEL ──────────────────────────────── */
+.label {
+  font-size: 11px; font-weight: 600; letter-spacing: 1.2px;
+  text-transform: uppercase; color: var(--text-3);
+  margin-bottom: 6px;
+}
+
+/* ── SELECT / INPUT ─────────────────────────────── */
+select, input[type=date] {
+  width: 100%; padding: 9px 12px;
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--r-sm); color: var(--text-1);
+  font-family: var(--font); font-size: 13px;
+  outline: none; appearance: none; -webkit-appearance: none;
+  cursor: pointer; transition: border-color .15s;
+}
+select:focus, input[type=date]:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(37,99,235,.1); }
+.sel-wrap { position: relative; }
+.sel-wrap::after { content: '\f282'; font-family: 'bootstrap-icons'; position: absolute; right: 11px; top: 50%; transform: translateY(-50%); color: var(--text-3); pointer-events: none; font-size: 12px; }
+
+/* ── TOGGLE SWITCH ──────────────────────────────── */
+.opt-row { display: flex; align-items: center; justify-content: space-between; padding: 7px 0; border-bottom: 1px solid var(--border); }
+.opt-row:last-child { border-bottom: none; }
+.opt-name { font-size: 13px; color: var(--text-2); font-weight: 400; }
+.tog { position: relative; width: 36px; height: 20px; cursor: pointer; flex-shrink: 0; }
+.tog input { display: none; }
+.tog-track { position: absolute; inset: 0; border-radius: 99px; background: var(--surface-2); border: 1px solid var(--border-2); transition: all .2s; }
+.tog input:checked + .tog-track { background: var(--accent); border-color: var(--accent); }
+.tog-thumb { position: absolute; top: 3px; left: 3px; width: 12px; height: 12px; border-radius: 50%; background: var(--border-2); transition: all .2s; pointer-events: none; }
+.tog input:checked ~ .tog-thumb { transform: translateX(16px); background: #fff; }
+
+/* ── BUTTONS ────────────────────────────────────── */
+.btn {
+  display: flex; align-items: center; justify-content: center; gap: 7px;
+  width: 100%; padding: 10px 16px; border: none; border-radius: var(--r);
+  font-family: var(--font); font-size: 13px; font-weight: 600;
+  cursor: pointer; transition: all .15s; outline: none; letter-spacing: .2px;
+}
+.btn-primary { background: var(--accent); color: #fff; }
+.btn-primary:hover:not(:disabled) { background: #1d4ed8; }
+.btn-primary:disabled { opacity: .45; cursor: default; }
+
+.btn-outline { background: transparent; border: 1px solid var(--border-2); color: var(--text-2); }
+.btn-outline:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); background: var(--accent-bg); }
+.btn-outline:disabled { opacity: .45; cursor: default; }
+
+.btn-danger { background: var(--red-bg); color: var(--red); border: 1px solid #fecaca; }
+.btn-danger:hover { background: var(--red); color: #fff; }
+
+.btn-success-state { background: #dcfce7; color: var(--green); border: 1px solid #bbf7d0; }
+.btn-success-state:hover { background: var(--green); color: #fff; }
+.btn-stop-state { background: var(--red); color: #fff; }
+.btn-stop-state:hover { background: #b91c1c; }
+
+.btn-icon {
+  width: 40px; flex-shrink: 0; padding: 10px 0;
+  background: var(--surface-2); border: 1px solid var(--border);
+  color: var(--text-2); border-radius: var(--r);
+  font-size: 17px; cursor: pointer; transition: all .15s;
+  display: flex; align-items: center; justify-content: center;
+}
+.btn-icon:hover { border-color: var(--border-2); color: var(--text-1); }
+
+/* ── SUCCESS POPUP ──────────────────────────────── */
+#success-area { min-height: 50px; display: flex; align-items: center; }
+#success-popup {
+  display: none; width: 100%;
+  background: var(--green-bg); border: 1px solid #bbf7d0;
+  border-radius: var(--r); padding: 9px 14px;
+  font-size: 13px; font-weight: 500; color: var(--green); text-align: center;
+  animation: fadeIn .2s ease;
+}
+@keyframes fadeIn { from{opacity:0;transform:translateY(-4px)} to{opacity:1;transform:none} }
+
+/* ── OCR OUTPUT ─────────────────────────────────── */
+#ocr-box {
+  flex: 1; min-height: 80px;
+  border: 1px solid var(--border); border-radius: var(--r);
+  background: var(--surface-2); padding: 10px;
+  overflow-y: auto;
+}
+.ocr-item { font-family: var(--mono); font-size: 12px; color: var(--text-2); padding: 2px 0; line-height: 1.8; }
+
+/* ── STATISTIK ──────────────────────────────────── */
+.stat-label-pill {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 10px 12px; border-radius: var(--r);
+  background: var(--accent-bg); border: 1px solid #bfdbfe;
+}
+.stat-label-key { font-size: 11px; font-weight: 600; letter-spacing: 1px; text-transform: uppercase; color: var(--accent); }
+.stat-label-val { font-family: var(--mono); font-size: 13px; font-weight: 500; color: var(--accent); }
+
+.stat-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 8px; }
+.stat-card {
+  background: var(--surface-2); border: 1px solid var(--border);
+  border-radius: var(--r); padding: 12px 8px; text-align: center;
+}
+.stat-num { font-family: var(--mono); font-size: 28px; font-weight: 500; line-height: 1; }
+.stat-key { font-size: 10px; font-weight: 600; letter-spacing: 1.2px; text-transform: uppercase; color: var(--text-3); margin-top: 5px; }
+.c-total { color: var(--text-1); }
+.c-ok    { color: var(--green); }
+.c-nok   { color: var(--red); }
+
+/* ── CENTER ─────────────────────────────────────── */
+#center { flex: 1; background: #1a1a1a; display: flex; flex-direction: column; min-width: 0; position: relative; }
+
+#video-area { flex: 1; position: relative; display: flex; align-items: center; justify-content: center; min-height: 0; overflow: hidden; }
+#video-feed, #scan-preview { width: 100%; height: 100%; object-fit: contain; display: none; position: absolute; inset: 0; }
+
+#video-ph { display: flex; flex-direction: column; align-items: center; gap: 12px; }
+.ph-ring { width: 80px; height: 80px; border-radius: 50%; border: 1.5px solid #333; display: flex; align-items: center; justify-content: center; color: #555; font-size: 32px; }
+#video-ph p { color: #555; font-size: 12px; letter-spacing: 2px; text-transform: uppercase; }
+
+#scan-overlay {
+  position: absolute; top: 14px; left: 50%; transform: translateX(-50%);
+  background: rgba(0,0,0,.7); backdrop-filter: blur(8px);
+  border: 1px solid rgba(255,255,255,.1);
+  padding: 5px 18px; border-radius: 99px;
+  font-size: 12px; font-weight: 500; color: rgba(255,255,255,.85);
+  display: none; white-space: nowrap; pointer-events: none; z-index: 5;
+}
+
+#result-badge {
+  position: absolute; bottom: 16px; left: 50%; transform: translateX(-50%);
+  padding: 10px 22px; border-radius: var(--r); min-width: 200px;
+  background: rgba(0,0,0,.75); backdrop-filter: blur(10px);
+  border: 1px solid rgba(255,255,255,.1);
+  text-align: center; display: none; z-index: 5;
+}
+#result-code   { font-family: var(--mono); font-size: 18px; letter-spacing: 2px; }
+#result-status { font-size: 11px; letter-spacing: 1.5px; text-transform: uppercase; color: #888; margin-top: 3px; }
+
+#file-dropzone {
+  display: none; position: absolute; inset: 0; z-index: 6;
+  flex-direction: column; align-items: center; justify-content: center; gap: 12px;
+  background: rgba(0,0,0,.82); backdrop-filter: blur(4px);
+  border: 1.5px dashed #555; cursor: pointer;
+  color: #aaa; font-size: 15px; font-weight: 500; letter-spacing: .5px;
+}
+#file-dropzone.show { display: flex; }
+#file-dropzone:hover, #file-dropzone.drag-over { border-color: #888; color: #ccc; }
+
+/* ── RIGHT PANEL TABLE ──────────────────────────── */
+#table-wrap {
+  flex: 1; min-height: 0; overflow-y: auto;
+  border: 1px solid var(--border); border-radius: var(--r);
+}
+#code-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+#code-table thead th {
+  background: var(--surface-2); position: sticky; top: 0; z-index: 1;
+  padding: 9px 10px; text-align: left;
+  border-bottom: 1px solid var(--border);
+  font-size: 11px; font-weight: 600; letter-spacing: .8px;
+  text-transform: uppercase; color: var(--text-3);
+}
+#code-table thead th:last-child { text-align: center; }
+#code-table tbody tr { border-bottom: 1px solid var(--border); cursor: pointer; transition: background .1s; }
+#code-table tbody tr:last-child { border-bottom: none; }
+#code-table tbody tr:hover { background: var(--surface-2); }
+#code-table tbody tr.selected { background: var(--accent-bg); }
+#code-table tbody tr.not-ok { background: var(--red-bg); }
+#code-table tbody tr.not-ok:hover { background: #fee2e2; }
+#code-table tbody td { padding: 9px 10px; color: var(--text-2); vertical-align: middle; }
+#code-table tbody td:nth-child(2) { font-family: var(--mono); font-size: 12px; color: var(--text-1); }
+#code-table tbody td:last-child { text-align: center; }
+.badge-ok  { display: inline-block; padding: 2px 10px; border-radius: 99px; font-size: 11px; font-weight: 600; background: var(--green-bg); color: var(--green); border: 1px solid #bbf7d0; }
+.badge-nok { display: inline-block; padding: 2px 10px; border-radius: 99px; font-size: 11px; font-weight: 600; background: var(--red-bg); color: var(--red); border: 1px solid #fecaca; }
+
+#right-dt { font-size: 12px; color: var(--text-3); font-family: var(--mono); }
+.data-head { display: flex; align-items: center; justify-content: space-between; }
+.data-count { font-size: 12px; color: var(--text-3); }
+
+/* ── MODAL ──────────────────────────────────────── */
+.modal-content { border: 1px solid var(--border); border-radius: 12px; box-shadow: var(--shadow-md); }
+.modal-header  { padding: 16px 20px; border-bottom: 1px solid var(--border); background: var(--surface); border-radius: 12px 12px 0 0; }
+.modal-title   { font-size: 15px; font-weight: 600; color: var(--text-1); }
+.modal-body    { padding: 18px 20px; background: var(--surface); }
+.modal-footer  { padding: 14px 20px; border-top: 1px solid var(--border); background: var(--surface-2); border-radius: 0 0 12px 12px; }
+
+.m-group { border: 1px solid var(--border); border-radius: var(--r); padding: 16px 14px 12px; position: relative; background: var(--surface); }
+.m-title { position: absolute; top: -9px; left: 12px; background: var(--surface); padding: 0 6px; font-size: 11px; font-weight: 600; letter-spacing: 1px; text-transform: uppercase; color: var(--text-3); }
+
+.modal .form-check-input { border-color: var(--border-2); cursor: pointer; }
+.modal .form-check-input:checked { background-color: var(--accent); border-color: var(--accent); }
+.modal .form-check-label { font-size: 13px; color: var(--text-2); cursor: pointer; }
+.modal select, .modal input[type=date] { font-size: 13px; background: var(--surface-2); }
+.warn-note { font-size: 11px; color: var(--amber); text-align: center; margin-top: 6px; }
+
+.btn-modal { width: 100%; padding: 10px; border: none; border-radius: var(--r); background: var(--accent); color: #fff; font-family: var(--font); font-size: 14px; font-weight: 600; cursor: pointer; transition: background .15s; }
+.btn-modal:hover:not(:disabled) { background: #1d4ed8; }
+.btn-modal:disabled { opacity: .5; cursor: default; }
+
+/* progress */
+.progress-wrap { display: none; margin-top: 12px; }
+.progress-track { height: 4px; background: var(--surface-2); border-radius: 99px; overflow: hidden; }
+.progress-fill  { height: 100%; background: var(--accent); border-radius: 99px; transition: width .3s; width: 0%; }
+.progress-msg   { font-size: 11px; color: var(--text-3); text-align: center; margin-top: 6px; }
+
+/* ── TOAST ──────────────────────────────────────── */
+#toast-ct {
+  position: fixed; top: 62px; right: 18px; z-index: 9999;
+  display: flex; flex-direction: column; gap: 8px; pointer-events: none;
+}
+.toast-item {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--r); padding: 12px 16px;
+  min-width: 280px; box-shadow: var(--shadow-md);
+  display: flex; align-items: flex-start; gap: 11px;
+  pointer-events: all; animation: slideIn .2s ease;
+}
+@keyframes slideIn { from{opacity:0;transform:translateX(12px)} to{opacity:1;transform:none} }
+.toast-item.success { border-left: 3px solid var(--green); }
+.toast-item.danger  { border-left: 3px solid var(--red); }
+.toast-item.warning { border-left: 3px solid var(--amber); }
+.toast-item.info    { border-left: 3px solid var(--accent); }
+.ti-icon { font-size: 16px; flex-shrink: 0; margin-top: 1px; }
+.ti-icon.success { color: var(--green); } .ti-icon.danger { color: var(--red); }
+.ti-icon.warning { color: var(--amber); } .ti-icon.info   { color: var(--accent); }
+.ti-body { flex: 1; }
+.ti-title { font-weight: 600; font-size: 13px; color: var(--text-1); }
+.ti-msg   { font-size: 12px; color: var(--text-2); margin-top: 1px; }
+.ti-x { background: none; border: none; color: var(--text-3); font-size: 16px; cursor: pointer; padding: 0; line-height: 1; flex-shrink: 0; }
+.ti-x:hover { color: var(--text-1); }
+</style>
+</head>
+<body>
+
+<!-- TOPBAR -->
+<header id="topbar">
+  <div class="brand">
+    <div class="brand-dot"></div>
+    <span class="brand-name">QC Battery</span>
+    <span class="brand-sep">·</span>
+    <span class="brand-sub">Inspector</span>
+  </div>
+  <div class="top-right">
+    <span id="clock">--:--:--</span>
+    <div id="cam-badge"><div class="dot"></div><span id="cam-txt">Camera Off</span></div>
+  </div>
+</header>
+
+<!-- APP -->
+<div id="app">
+
+<!-- ── LEFT PANEL ── -->
+<div class="panel" id="left-panel">
+
+  <div>
+    <div class="label">Configuration</div>
+    <button class="btn btn-outline" id="btn-setting" onclick="openSetting()">
+      <i class="bi bi-sliders"></i> Setting
+    </button>
+  </div>
+
+  <div>
+    <div class="label">Options</div>
+    <div style="border:1px solid var(--border);border-radius:var(--r);padding:4px 12px;">
+      <div class="opt-row">
+        <span class="opt-name">Binary Color</span>
+        <label class="tog"><input type="checkbox" id="chk-edge" onchange="onOptionChange()"><div class="tog-track"></div><div class="tog-thumb"></div></label>
+      </div>
+      <div class="opt-row">
+        <span class="opt-name">Split Screen</span>
+        <label class="tog"><input type="checkbox" id="chk-split" onchange="onOptionChange()"><div class="tog-track"></div><div class="tog-thumb"></div></label>
+      </div>
+    </div>
+  </div>
+
+  <div>
+    <div class="label">Camera</div>
+    <button class="btn btn-success-state" id="btn-start" onclick="toggleCamera()">
+      <i class="bi bi-play-fill"></i> Start
+    </button>
+  </div>
+
+  <div>
+    <div class="label">Scan</div>
+    <button class="btn btn-outline" id="btn-scan" onclick="clickScanFile()">
+      <i class="bi bi-image"></i> Scan from File
+    </button>
+  </div>
+
+  <!-- Success popup -->
+  <div id="success-area"><div id="success-popup"></div></div>
+
+  <div style="flex:1;display:flex;flex-direction:column;min-height:0;">
+    <div class="label">OCR Output</div>
+    <div id="ocr-box">
+      <div class="ocr-item" style="color:var(--text-3)">Menunggu deteksi…</div>
+    </div>
+  </div>
+
+  <div>
+    <div class="label">Statistik</div>
+    <div class="stat-label-pill" style="margin-bottom:8px">
+      <span class="stat-label-key">Label</span>
+      <span class="stat-label-val" id="stat-label">—</span>
+    </div>
+    <div class="stat-grid">
+      <div class="stat-card"><div class="stat-num c-total" id="stat-total">0</div><div class="stat-key">Total</div></div>
+      <div class="stat-card"><div class="stat-num c-ok"    id="stat-ok">0</div><div class="stat-key">OK</div></div>
+      <div class="stat-card"><div class="stat-num c-nok"   id="stat-nok">0</div><div class="stat-key">Not OK</div></div>
+    </div>
+  </div>
+
+</div>
+
+<!-- ── CENTER ── -->
+<div id="center">
+  <div id="video-area">
+    <img id="video-feed" alt="live">
+    <img id="scan-preview" alt="scan">
+    <div id="video-ph">
+      <div class="ph-ring"><i class="bi bi-camera-video-off"></i></div>
+      <p>Camera Offline</p>
+    </div>
+    <div id="scan-overlay"></div>
+    <div id="result-badge"><div id="result-code">—</div><div id="result-status">Waiting</div></div>
+    <div id="file-dropzone" onclick="document.getElementById('fhidden').click()" ondragover="onDragOver(event)" ondragleave="onDragLeave(event)" ondrop="onFileDrop(event)">
+      <i class="bi bi-cloud-arrow-up" style="font-size:44px"></i>
+      <div>Drop image here or click to browse</div>
+      <div style="font-size:12px;opacity:.5">JPG · PNG · BMP · WEBP</div>
+    </div>
+    <input type="file" id="fhidden" accept=".jpg,.jpeg,.png,.bmp,.webp" onchange="onFileChange(event)" style="display:none">
+  </div>
+</div>
+
+<!-- ── RIGHT PANEL ── -->
+<div class="panel" id="right-panel">
+
+  <div>
+    <button class="btn btn-primary" onclick="openExport()">
+      <i class="bi bi-file-earmark-excel"></i> Export Data
+    </button>
+  </div>
+
+  <div id="right-dt"></div>
+
+  <div class="data-head">
+    <div class="label" style="margin:0">Data Barang</div>
+    <div class="data-count" id="data-count">0 record</div>
+  </div>
+
+  <div id="table-wrap">
+    <table id="code-table">
+      <thead><tr><th>Waktu</th><th>Label</th><th style="text-align:center">Status</th></tr></thead>
+      <tbody id="code-tbody">
+        <tr><td colspan="3" style="padding:28px;text-align:center;color:var(--text-3)">Pilih label terlebih dahulu</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div style="display:flex;gap:8px;flex-shrink:0">
+    <button class="btn btn-danger" style="flex:1" onclick="clearSelected()">
+      <i class="bi bi-trash3"></i> Clear
+    </button>
+    <button class="btn-icon" title="Refresh" onclick="refreshData()">⭮</button>
+  </div>
+
+</div>
+</div><!-- /app -->
+
+
+<!-- MODAL: SETTING -->
+<div class="modal fade" id="mSetting" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered" style="max-width:300px">
+    <div class="modal-content">
+      <div class="modal-header">
+        <span class="modal-title">Setting</span>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body" style="display:flex;flex-direction:column;gap:14px">
+        <div class="m-group">
+          <span class="m-title">Select Camera</span>
+          <div class="sel-wrap"><select id="s-cam"></select></div>
+        </div>
+        <div style="display:flex;gap:10px">
+          <div class="m-group" style="flex:1">
+            <span class="m-title">Tipe</span>
+            <div class="sel-wrap"><select id="s-preset" onchange="syncSettingLabel()"><option value="JIS">JIS</option><option value="DIN">DIN</option></select></div>
+          </div>
+          <div class="m-group" style="flex:1;min-width:0">
+            <span class="m-title">Label</span>
+            <div class="sel-wrap"><select id="s-label" style="font-size:12px"></select></div>
+            <div class="warn-note">* Pilih label terlebih dahulu</div>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer"><button class="btn-modal" onclick="saveSetting()">Save Setting</button></div>
+    </div>
+  </div>
+</div>
+
+
+<!-- MODAL: EXPORT -->
+<div class="modal fade" id="mExport" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered" style="max-width:340px">
+    <div class="modal-content">
+      <div class="modal-header">
+        <span class="modal-title">Export Data</span>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body" style="display:flex;flex-direction:column;gap:12px">
+
+        <div style="display:flex;gap:10px">
+          <div class="m-group" style="flex:1">
+            <span class="m-title">Date Range</span>
+            <div class="form-check mt-2"><input class="form-check-input" type="radio" name="xdate" id="rb-all" value="All" onchange="onXDate()"><label class="form-check-label" for="rb-all">Semua Data</label></div>
+            <div class="form-check mt-1"><input class="form-check-input" type="radio" name="xdate" id="rb-today" value="Today" onchange="onXDate()" checked><label class="form-check-label" for="rb-today">Hari Ini</label></div>
+          </div>
+          <div class="m-group" style="flex:1;min-width:0">
+            <span class="m-title">Tipe &amp; Label</span>
+            <div style="display:flex;align-items:center;gap:6px;margin-top:8px">
+              <span style="font-size:12px;color:var(--text-3);white-space:nowrap">Tipe:</span>
+              <div class="sel-wrap" style="flex:1"><select id="x-preset" style="font-size:12px;padding:6px 24px 6px 8px" onchange="populateXLabel()"><option value="Preset">Preset</option><option value="JIS">JIS</option><option value="DIN">DIN</option></select></div>
+            </div>
+            <div class="form-check mt-2"><input class="form-check-input" type="checkbox" id="x-lchk" checked onchange="onXLabelChk()"><label class="form-check-label" for="x-lchk">Pilih Label</label></div>
+            <div class="sel-wrap"><select id="x-label" style="font-size:12px;padding:6px 24px 6px 8px"></select></div>
+          </div>
+        </div>
+
+        <div class="m-group">
+          <span class="m-title">Pilih Bulan</span>
+          <div style="display:flex;align-items:center;gap:8px;margin-top:8px">
+            <input type="checkbox" id="x-mchk" onchange="onXMonthChk()" style="accent-color:var(--accent);width:14px;height:14px;cursor:pointer">
+            <div class="sel-wrap" style="flex:1"><select id="x-month" disabled style="font-size:12px;padding:6px 24px 6px 8px"></select></div>
+            <div class="sel-wrap" style="width:80px"><select id="x-year" disabled style="font-size:12px;padding:6px 24px 6px 8px"></select></div>
+          </div>
+        </div>
+
+        <div class="m-group">
+          <span class="m-title">Pilih Tanggal</span>
+          <div style="display:flex;align-items:center;gap:8px;margin-top:8px">
+            <input type="checkbox" id="x-dchk" onchange="onXDateChk()" style="accent-color:var(--accent);width:14px;height:14px;cursor:pointer">
+            <input type="date" id="x-start" disabled style="flex:1;font-size:12px;padding:6px 8px">
+            <span style="color:var(--text-3)">—</span>
+            <input type="date" id="x-end" disabled style="flex:1;font-size:12px;padding:6px 8px">
+          </div>
+        </div>
+
+        <div class="progress-wrap" id="x-prog-wrap">
+          <div class="progress-track"><div class="progress-fill" id="x-prog-bar"></div></div>
+          <div class="progress-msg" id="x-prog-msg"></div>
+        </div>
+
+      </div>
+      <div class="modal-footer">
+        <button class="btn-modal" id="btn-export-do" onclick="doExport()">
+          <i class="bi bi-download"></i> Export
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="toast-ct"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.2/js/bootstrap.bundle.min.js"></script>
+<script>
+/* ── State ─────────────────────────────────── */
+const S = {
+  preset:'JIS', label:'', running:false,
+  jis:[], din:[], months:[],
+  records:[], sel:new Set(), xrange:'Today',
+};
+
+/* ── Socket ────────────────────────────────── */
+const io_socket = io();
+io_socket.on('init_data', d => {
+  S.running=d.running||false; S.preset=d.preset||'JIS'; S.label=d.label||'';
+  syncStartBtn(); setCamBadge(S.running); renderTable(d.records||[]);
+});
+io_socket.on('frame', d => {
+  hide('video-ph'); hide('scan-preview');
+  const f=el('video-feed'); f.src='data:image/jpeg;base64,'+d.img; show(f);
+});
+io_socket.on('code_detected', d => {
+  const msg=d.message||'', recs=d.records||[];
+  resetScanBtn();
+  if(msg==='FAILED') { toast('Gagal','Tidak ada label terdeteksi.','danger'); showBadge('—','FAILED','red'); }
+  else if(msg.startsWith('ERROR:')) { toast('Error',msg.slice(6),'danger'); showBadge('ERR','Error','red'); }
+  else { showSuccess('Scan Berhasil!\n'+msg); showBadge(msg,'DETECTED','green'); }
+  renderTable(recs);
+});
+io_socket.on('camera_status', d => {
+  S.running=d.active; syncStartBtn(); setCamBadge(d.active);
+  if(!d.active){ hide(el('video-feed')); hide(el('scan-preview')); showEl('video-ph'); hide(el('scan-overlay')); }
+});
+io_socket.on('ocr_text', d => renderOcr(d.texts||[]));
+io_socket.on('data_reset', () => { renderTable([]); toast('Info','Data di-reset untuk hari baru.','info'); });
+io_socket.on('export_progress', d => {
+  const p=d.total>0?Math.round(d.current/d.total*100):0;
+  el('x-prog-bar').style.width=p+'%'; el('x-prog-msg').textContent=d.msg;
+});
+io_socket.on('export_done', d => {
+  el('x-prog-wrap').style.display='none';
+  const b=el('btn-export-do'); b.disabled=false; b.innerHTML='<i class="bi bi-download"></i> Export';
+  if(d.ok&&d.path){ const fn=d.path.split(/[\\/]/).pop(); dlFile('/api/export/download/'+encodeURIComponent(fn),fn); bootstrap.Modal.getInstance(el('mExport'))?.hide(); toast('Berhasil','Diekspor: '+fn,'success'); }
+  else toast('Export Gagal',d.msg||'Kesalahan.','danger');
+});
+
+/* ── Init ──────────────────────────────────── */
+async function init(){
+  startClock();
+  const ld=await (await fetch('/api/labels')).json();
+  S.jis=ld.jis||[]; S.din=ld.din||[]; S.months=ld.months||[];
+  populateXMonth(); populateXLabel();
+  await loadCams();
+  const sd=await (await fetch('/api/state')).json();
+  S.preset=sd.preset||'JIS'; S.label=sd.target_label||'';
+  el('s-preset').value=S.preset; syncSettingLabel();
+  await refreshData(); updateDt(); setInterval(updateDt,1000);
+}
+
+/* ── Clock ─────────────────────────────────── */
+const DN=['Minggu','Senin','Selasa','Rabu','Kamis','Jumat','Sabtu'];
+const MN=['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
+function startClock(){ const t=()=>{ el('clock').textContent=new Date().toLocaleTimeString('id-ID',{hour:'2-digit',minute:'2-digit',second:'2-digit'}); }; t(); setInterval(t,1000); }
+function updateDt(){ const n=new Date(); el('right-dt').textContent=`${DN[n.getDay()]}, ${n.getDate()} ${MN[n.getMonth()]} ${n.getFullYear()}  ·  ${n.toLocaleTimeString('id-ID',{hour:'2-digit',minute:'2-digit',second:'2-digit'})}`; }
+
+/* ── Camera ────────────────────────────────── */
+async function loadCams(){
+  const d=await (await fetch('/api/cameras')).json();
+  const s=el('s-cam'); s.innerHTML='';
+  (d.cameras||[]).forEach(c=>{ const o=document.createElement('option'); o.value=c.index; o.textContent=c.name; s.appendChild(o); });
+}
+async function toggleCamera(){ S.running?await stopCam():await startCam(); }
+async function startCam(){
+  if(!validLabel(S.label,S.preset)){ toast('Perhatian','Pilih label terlebih dahulu.','warning'); return; }
+  const r=await (await fetch('/api/camera/start',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({
+    preset:S.preset,label:S.label,camera_index:parseInt(el('s-cam').value)||0,
+    edge_mode:el('chk-edge').checked,split_mode:el('chk-split').checked
+  })})).json();
+  if(!r.ok){ toast('Error',r.msg,'danger'); return; }
+  hide(el('scan-preview')); hide(el('result-badge'));
+  S.running=true; syncStartBtn(); lockSetting(true); showOverlay();
+}
+async function stopCam(){
+  await fetch('/api/camera/stop',{method:'POST'});
+  S.running=false; syncStartBtn(); lockSetting(false); hideSuccess();
+}
+function syncStartBtn(){
+  const b=el('btn-start');
+  if(S.running){ b.className='btn btn-stop-state'; b.innerHTML='<i class="bi bi-stop-fill"></i> Stop'; }
+  else { b.className='btn btn-success-state'; b.innerHTML='<i class="bi bi-play-fill"></i> Start'; }
+}
+function setCamBadge(on){
+  const b=el('cam-badge'); b.classList.toggle('on',on); el('cam-txt').textContent=on?'Camera On':'Camera Off';
+}
+function lockSetting(v){ el('btn-setting').disabled=v; }
+function showOverlay(){ const o=el('scan-overlay'); o.textContent=S.preset+' · '+S.label; show(o); }
+function validLabel(l,p){ if(!l||l==='Select Label . . .'||!l.trim()) return false; return (p==='DIN'?S.din:S.jis).slice(1).includes(l); }
+async function onOptionChange(){
+  if(!S.running) return;
+  await fetch('/api/camera/settings',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({preset:S.preset,label:S.label,edge_mode:el('chk-edge').checked,split_mode:el('chk-split').checked})});
+}
+
+/* ── Scan File ─────────────────────────────── */
+function clickScanFile(){
+  if(!validLabel(S.label,S.preset)){ toast('Perhatian','Pilih label terlebih dahulu.','warning'); return; }
+  if(S.running){ toast('Info','Stop kamera terlebih dahulu.','info'); return; }
+  el('fhidden').click();
+}
+function onFileChange(e){ const f=e.target.files[0]; if(f){ doScan(f); e.target.value=''; } }
+function onDragOver(e){ e.preventDefault(); el('file-dropzone').classList.add('drag-over'); }
+function onDragLeave(e){ el('file-dropzone').classList.remove('drag-over'); }
+function onFileDrop(e){ e.preventDefault(); el('file-dropzone').classList.remove('drag-over'); const f=e.dataTransfer.files[0]; if(f) doScan(f); }
+
+async function doScan(file){
+  /* Tampilkan foto SEGERA */
+  const reader=new FileReader();
+  reader.onload=e=>{
+    const p=el('scan-preview'); p.src=e.target.result; show(p);
+    hide(el('video-feed')); hide(el('video-ph'));
+  };
+  reader.readAsDataURL(file);
+  showBadge('Scanning…','Processing','amber');
+
+  await fetch('/api/camera/settings',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({preset:S.preset,label:S.label,edge_mode:el('chk-edge').checked,split_mode:el('chk-split').checked})});
+  const b=el('btn-scan'); b.innerHTML='<i class="bi bi-hourglass-split"></i> Scanning…'; b.disabled=true;
+  const fd=new FormData(); fd.append('file',file);
+  const r=await (await fetch('/api/scan/file',{method:'POST',body:fd})).json();
+  if(!r.ok){ toast('Error',r.msg,'danger'); resetScanBtn(); }
+}
+function resetScanBtn(){ const b=el('btn-scan'); b.innerHTML='<i class="bi bi-image"></i> Scan from File'; b.disabled=false; }
+
+/* ── Result Badge ──────────────────────────── */
+function showBadge(code,status,color){
+  const b=el('result-badge'), c=el('result-code'), s=el('result-status');
+  const colors={green:'var(--green)',red:'var(--red)',amber:'var(--amber)'};
+  c.textContent=code; c.style.color=colors[color]||'#fff'; s.textContent=status; show(b);
+}
+
+/* ── OCR ────────────────────────────────────── */
+function renderOcr(texts){
+  const box=el('ocr-box'); box.innerHTML='';
+  if(!texts.length){ box.innerHTML='<div class="ocr-item" style="color:var(--text-3)">Menunggu deteksi…</div>'; return; }
+  texts.forEach(t=>{ const d=document.createElement('div'); d.className='ocr-item'; d.textContent=t; box.appendChild(d); });
+}
+
+/* ── Table ──────────────────────────────────── */
+function renderTable(records){
+  S.records=records||[]; S.sel.clear();
+  const tbody=el('code-tbody'), cnt=el('data-count');
+  if(!validLabel(S.label,S.preset)){
+    tbody.innerHTML='<tr><td colspan="3" style="padding:28px;text-align:center;color:var(--text-3)">Pilih label terlebih dahulu</td></tr>';
+    cnt.textContent='0 record';
+    el('stat-label').textContent='—'; ['stat-total','stat-ok','stat-nok'].forEach(id=>el(id).textContent='0');
+    return;
+  }
+  const filtered=[...S.records].reverse().filter(r=>(r.target||r.code)===S.label);
+  cnt.textContent=filtered.length+' record';
+  let ok=0,nok=0;
+  if(!filtered.length){
+    tbody.innerHTML='<tr><td colspan="3" style="padding:28px;text-align:center;color:var(--text-3)">Belum ada data untuk label ini</td></tr>';
+  } else {
+    tbody.innerHTML='';
+    filtered.forEach(r=>{
+      const tr=document.createElement('tr');
+      const st=r.status||'OK';
+      if(st==='Not OK'){ tr.classList.add('not-ok'); nok++; } else ok++;
+      const time=(r.time||'').split(' ')[1]||'';
+      const lbl=`${r.code} (${r.type})`;
+      const badge=st==='OK'?'<span class="badge-ok">OK</span>':'<span class="badge-nok">Not OK</span>';
+      tr.innerHTML=`<td>${time}</td><td>${lbl}</td><td>${badge}</td>`;
+      tr.addEventListener('click',()=>{ tr.classList.toggle('selected'); tr.classList.contains('selected')?S.sel.add(r.id):S.sel.delete(r.id); });
+      tr.addEventListener('dblclick',()=>{ if(r.imgPath){ const fn=r.imgPath.split(/[\\/]/).pop(); window.open('/api/image/'+encodeURIComponent(fn),'_blank'); } });
+      tbody.appendChild(tr);
+    });
+  }
+  el('stat-label').textContent=S.label||'—';
+  el('stat-total').textContent=filtered.length;
+  el('stat-ok').textContent=ok; el('stat-nok').textContent=nok;
+}
+
+async function refreshData(){ const d=await (await fetch('/api/data/today')).json(); renderTable(d.records||[]); }
+async function clearSelected(){
+  if(!S.sel.size){ toast('Perhatian','Pilih data terlebih dahulu.','warning'); return; }
+  if(!confirm(`Hapus ${S.sel.size} item?`)) return;
+  const d=await (await fetch('/api/data/delete',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({ids:[...S.sel]})})).json();
+  if(d.ok){ toast('Sukses',`${S.sel.size} data dihapus.`,'success'); await refreshData(); } else toast('Error',d.msg,'danger');
+}
+
+/* ── Success popup ─────────────────────────── */
+let _st;
+function showSuccess(m){ const p=el('success-popup'); p.innerHTML=m.replace(/\n/g,'<br>'); show(p); clearTimeout(_st); _st=setTimeout(hideSuccess,3500); }
+function hideSuccess(){ hide(el('success-popup')); }
+
+/* ── Setting modal ─────────────────────────── */
+function openSetting(){
+  if(S.running){ toast('Perhatian','Stop kamera sebelum membuka Setting.','warning'); return; }
+  el('s-preset').value=S.preset; syncSettingLabel();
+  new bootstrap.Modal(el('mSetting')).show();
+}
+function syncSettingLabel(){
+  const types=el('s-preset').value==='DIN'?S.din:S.jis;
+  const s=el('s-label'); s.innerHTML='';
+  types.forEach(t=>{ const o=document.createElement('option'); o.value=t; o.textContent=t; if(t==='Select Label . . .') o.disabled=true; s.appendChild(o); });
+  if(S.label&&types.includes(S.label)) s.value=S.label; else s.value=types[0]||'';
+}
+async function saveSetting(){
+  const p=el('s-preset').value, l=el('s-label').value;
+  if(!validLabel(l,p)){ toast('Perhatian','Pilih label yang valid.','warning'); return; }
+  S.preset=p; S.label=l;
+  await fetch('/api/camera/settings',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({preset:S.preset,label:S.label,edge_mode:el('chk-edge').checked,split_mode:el('chk-split').checked})});
+  await refreshData();
+  bootstrap.Modal.getInstance(el('mSetting'))?.hide();
+}
+
+/* ── Export modal ──────────────────────────── */
+function openExport(){
+  el('x-preset').value=S.preset; populateXLabel();
+  const t=new Date().toISOString().split('T')[0]; el('x-start').value=t; el('x-end').value=t;
+  new bootstrap.Modal(el('mExport')).show();
+}
+function populateXMonth(){
+  const ms=el('x-month'); ms.innerHTML=''; S.months.forEach(m=>{ const o=document.createElement('option'); o.value=m; o.textContent=m; ms.appendChild(o); });
+  const cm=new Date().toLocaleString('en-US',{month:'long'}); if([...ms.options].some(o=>o.value===cm)) ms.value=cm;
+  const ys=el('x-year'); ys.innerHTML=''; const cy=new Date().getFullYear(); for(let y=cy;y>=cy-4;y--){ const o=document.createElement('option'); o.value=y; o.textContent=y; ys.appendChild(o); }
+}
+function populateXLabel(){
+  const pv=el('x-preset').value, act=pv==='Preset'?S.preset:pv, types=act==='DIN'?S.din:S.jis;
+  const s=el('x-label'); s.innerHTML='<option value="All Label">All Label</option>';
+  types.slice(1).forEach(t=>{ const o=document.createElement('option'); o.value=t; o.textContent=t; s.appendChild(o); });
+  if(S.label&&[...s.options].some(o=>o.value===S.label)) s.value=S.label;
+}
+function onXDate(){ S.xrange=document.querySelector('input[name="xdate"]:checked').value; }
+function onXLabelChk(){ el('x-label').disabled=!el('x-lchk').checked; }
+function onXMonthChk(){
+  const c=el('x-mchk').checked; el('x-month').disabled=!c; el('x-year').disabled=!c;
+  if(c){ el('x-dchk').checked=false; onXDateChk_off(); el('rb-all').checked=true; el('rb-today').disabled=true; S.xrange='Month'; }
+  else { el('rb-today').disabled=false; if(!el('x-dchk').checked){ el('rb-today').checked=true; S.xrange='Today'; } }
+}
+function onXDateChk(){
+  const c=el('x-dchk').checked; el('x-start').disabled=!c; el('x-end').disabled=!c;
+  if(c){ el('x-mchk').checked=false; onXMonthChk_off(); el('rb-all').checked=true; el('rb-today').disabled=true; S.xrange='CustomDate'; }
+  else { el('rb-today').disabled=false; if(!el('x-mchk').checked){ el('rb-today').checked=true; S.xrange='Today'; } }
+}
+function onXMonthChk_off(){ el('x-month').disabled=true; el('x-year').disabled=true; }
+function onXDateChk_off(){ el('x-start').disabled=true; el('x-end').disabled=true; }
+
+async function doExport(){
+  const b=el('btn-export-do'); b.disabled=true; b.innerHTML='<i class="bi bi-hourglass-split"></i> Memproses…';
+  el('x-prog-wrap').style.display='block'; el('x-prog-bar').style.width='0%'; el('x-prog-msg').textContent='';
+  let range=S.xrange;
+  if(el('x-mchk').checked) range='Month'; if(el('x-dchk').checked) range='CustomDate';
+  if(!el('x-mchk').checked&&!el('x-dchk').checked) range=document.querySelector('input[name="xdate"]:checked').value;
+  const payload={date_range:range,preset:el('x-preset').value,label:el('x-lchk').checked?el('x-label').value:'All Label',month:el('x-month').value,year:el('x-year').value,start_date:el('x-start').value,end_date:el('x-end').value};
+  const r=await (await fetch('/api/export',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)})).json();
+  if(!r.ok){ toast('Error',r.msg,'danger'); b.disabled=false; b.innerHTML='<i class="bi bi-download"></i> Export'; el('x-prog-wrap').style.display='none'; }
+}
+
+/* ── Toast ──────────────────────────────────── */
+function toast(title,msg,type){
+  const c=el('toast-ct'), id='t'+Date.now();
+  const ico={success:'bi-check-circle-fill',danger:'bi-x-circle-fill',warning:'bi-exclamation-triangle-fill',info:'bi-info-circle-fill'};
+  const d=document.createElement('div'); d.id=id; d.className='toast-item '+type;
+  d.innerHTML=`<i class="bi ${ico[type]||'bi-info-circle'} ti-icon ${type}"></i><div class="ti-body"><div class="ti-title">${title}</div><div class="ti-msg">${msg.replace(/\n/g,'<br>')}</div></div><button class="ti-x" onclick="document.getElementById('${id}').remove()">×</button>`;
+  c.appendChild(d); setTimeout(()=>{ const e=document.getElementById(id); if(e) e.remove(); },5000);
+}
+
+/* ── Helpers ────────────────────────────────── */
+const el = id => document.getElementById(id);
+const show = e => { if(typeof e==='string') el(e).style.display='block'; else e.style.display='block'; };
+const showEl = id => el(id).style.display='flex';
+const hide = e => { if(typeof e==='string') el(e).style.display='none'; else e.style.display='none'; };
+function dlFile(url,name){ const a=document.createElement('a'); a.href=url; a.download=name; document.body.appendChild(a); a.click(); a.remove(); }
+
+init();
+</script>
+</body>
+</html>

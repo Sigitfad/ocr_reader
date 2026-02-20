@@ -132,261 +132,252 @@ def execute_export(sql_filter="", date_range_desc="", export_label="", current_p
             'target_session': 'Target Session'  #target_session -> Target Session
         }, inplace=True)
         
-        # Reorder columns agar sesuai urutan yang diinginkan di Excel
-        # Urutan: No, Image, Label, Date/Time, Standard, Status, Image Path (hidden), Target Session (hidden)
+        #Reorder columns agar sesuai urutan yang diinginkan di Excel
+        #Urutan: No, Image, Label, Date/Time, Standard, Status, Image Path (hidden), Target Session (hidden)
         df = df[['No', 'Image', 'Label', 'Date/Time', 'Standard', 'Status', 'Image Path', 'Target Session']]
 
         update_progress(30, 100, "Membuat file Excel...")
 
-        # Buat Excel file dengan xlsxwriter engine
-        # xlsxwriter memberikan kontrol penuh atas formatting, styling, dan insert image
+        #Buat Excel file dengan xlsxwriter engine
+        #xlsxwriter memberikan kontrol penuh atas formatting, styling, dan insert image
         writer = pd.ExcelWriter(output_path, engine='xlsxwriter')
         
         sheet_name = datetime.now().strftime("%Y-%m-%d") #Nama sheet menggunakan tanggal hari ini (YYYY-MM-DD)
         
-        # Write DataFrame ke Excel tanpa header dan index
-        # header=False karena kita akan write header manual dengan format custom
-        # startrow=START_ROW_DATA (row 7) karena row 1-6 untuk info header
+        #Write DataFrame ke Excel tanpa header dan index
+        #header=False karena kita akan write header manual dengan format custom
+        #startrow=START_ROW_DATA (row 7) karena row 1-6 untuk info header
         df.to_excel(writer, sheet_name=sheet_name, index=False, header=False, startrow=START_ROW_DATA)
         
-        # Ambil workbook dan worksheet object untuk formatting
+        #Ambil workbook dan worksheet object untuk formatting
         workbook = writer.book
         worksheet = writer.sheets[sheet_name]
         
         update_progress(35, 100, "Mengatur format Excel...")
         
-        # Define format untuk header tabel (row 7)
-        # Bold, centered, abu-abu background
+        #Define format untuk header tabel (row 7)
+        #Bold, centered, abu-abu background
         header_format = workbook.add_format({'bold': True, 'align': 'center', 'valign': 'vcenter', 'font_color': 'white', 'bg_color': '#596CDAAD'})
         
-        # Define format untuk info rows (1-6)
-        # Bold, aligned left, font size 11
+        #Define format untuk info rows (1-6)
+        #Bold, aligned left, font size 11
         info_merge_format = workbook.add_format({
             'bold': True, 'align': 'left', 'valign': 'vleft', 'font_size': 11
         })
 
-        # Define format untuk data cells
-        # Centered dengan border
+        #Define format untuk data cells
+        #Centered dengan border
         center_format = workbook.add_format({'align': 'center', 'valign': 'vcenter', 'border': 1})
         
-        # Format khusus untuk datetime cells
-        # Format: yyyy-mm-dd hh:mm:ss, centered, border
+        #Format khusus untuk datetime cells
+        #Format: yyyy-mm-dd hh:mm:ss, centered, border
         datetime_center_format = workbook.add_format({'num_format': 'yyyy-mm-dd hh:mm:ss', 'align': 'center', 'valign': 'vcenter', 'border': 1})
         
-        # Define format untuk "Not OK" rows (red background)
-        # Background merah, text putih untuk highlight error
+        #Define format untuk "Not OK" rows (red background): Background merah, text putih untuk highlight error
         not_ok_format = workbook.add_format({'align': 'center', 'valign': 'vcenter', 'border': 1, 'bg_color': '#FF0000', 'font_color': '#FFFFFF'})
         
-        # Format datetime untuk Not OK rows
+        #Format datetime untuk Not OK rows
         not_ok_datetime_format = workbook.add_format({'num_format': 'yyyy-mm-dd hh:mm:ss', 'align': 'center', 'valign': 'vcenter', 'border': 1, 'bg_color': '#FF0000', 'font_color': '#FFFFFF'})
         
-        # Row 1: Date Range
-        # Merge cell A1:B1 dan tulis info tanggal export
+        #Row 1: Date Range: Merge cell A1:B1 dan tulis info tanggal export
         date_text = f"Date : {date_range_desc}"
         worksheet.merge_range('A1:B1', date_text, info_merge_format)
         
-        # Row 2: Type
-        # Merge cell A2:B2 dan tulis tipe battery (JIS/DIN/Mixed)
+        #Row 2: Type: Merge cell A2:B2 dan tulis tipe battery (JIS/DIN/Mixed)
         type_text = f"Type : {export_preset}"
         worksheet.merge_range('A2:B2', type_text, info_merge_format)
         
-        # Row 3: Label
-        # Merge cell A3:B3 dan tulis label/sesi yang diexport
+        #Row 3: Label: Merge cell A3:B3 dan tulis label/sesi yang diexport
         label_text = f"Label : {label_display}"
         worksheet.merge_range('A3:B3', label_text, info_merge_format)
         
-        # Row 4: Status OK
-        # Merge cell A4:B4 dan tulis jumlah data OK
+        #Row 4: Status OK: Merge cell A4:B4 dan tulis jumlah data OK
         status_ok_text = f"OK : {qty_ok}"
         worksheet.merge_range('A4:B4', status_ok_text, info_merge_format)
         
-        # Row 5: Status Not OK
-        # Merge cell A5:B5 dan tulis jumlah data Not OK
+        #Row 5: Status Not OK: Merge cell A5:B5 dan tulis jumlah data Not OK
         status_not_ok_text = f"Not OK : {qty_not_ok}"
         worksheet.merge_range('A5:B5', status_not_ok_text, info_merge_format)
         
-        # Row 6: QTY Actual
-        # Merge cell A6:B6 dan tulis total quantity semua data
+        #Row 6: QTY Actual: Merge cell A6:B6 dan tulis total quantity semua data
         qty_text = f"QTY Actual : {qty_actual}"
         worksheet.merge_range('A6:B6', qty_text, info_merge_format)
         
-        # Row 7: Table Headers
-        # Write header tabel dengan format bold dan background abu-abu
+        #Row 7: Table Headers: Write header tabel dengan format bold dan background abu-abu
         for col_num, value in enumerate(df.columns.values):
             worksheet.write(START_ROW_DATA - 1, col_num, value, header_format)
         
-        # Set column widths untuk setiap kolom
-        # Lebar dalam satuan karakter (approx)
-        worksheet.set_column('A:A', 5)  # No - narrow column
-        worksheet.set_column('B:B', 30)  # Image - wide untuk accommodate gambar
-        worksheet.set_column('C:C', 20)  # Label - medium
-        worksheet.set_column('D:D', 25)  # Date/Time - cukup untuk format datetime
-        worksheet.set_column('E:E', 10)  # Standard - narrow
-        worksheet.set_column('F:F', 10)  # Status - narrow
-        worksheet.set_column('G:G', 0, options={'hidden': True})  # Hide path column - tidak perlu ditampilkan
-        worksheet.set_column('H:H', 0, options={'hidden': True})  # Hide target session column - tidak perlu ditampilkan
+        #Set column widths untuk setiap kolom: Lebar dalam satuan karakter (approx)
+        worksheet.set_column('A:A', 5)  #No - narrow column
+        worksheet.set_column('B:B', 30)  #Image - wide untuk accommodate gambar
+        worksheet.set_column('C:C', 20)  #Label - medium
+        worksheet.set_column('D:D', 25)  #Date/Time - cukup untuk format datetime
+        worksheet.set_column('E:E', 10)  #Standard - narrow
+        worksheet.set_column('F:F', 10)  #Status - narrow
+        worksheet.set_column('G:G', 0, options={'hidden': True})  #Hide path column - tidak perlu ditampilkan
+        worksheet.set_column('H:H', 0, options={'hidden': True})  #Hide target session column - tidak perlu ditampilkan
 
         update_progress(40, 100, "Menulis data ke Excel...")
 
-        # Iterate setiap row data dan tulis ke Excel
-        # iterrows() mengembalikan (index, row_data) untuk setiap baris
+        #Iterate setiap row data dan tulis ke Excel
+        #iterrows() mengembalikan (index, row_data) untuk setiap baris
         total_rows = len(df)
         for row_num, row_data in df.iterrows():
-            # Update progress setiap 10 rows atau di row terakhir
+            #Update progress setiap 10 rows atau di row terakhir
             if row_num % 10 == 0 or row_num == total_rows - 1:
                 progress = 40 + int((row_num / total_rows) * 50)  # 40-90% untuk processing rows
                 update_progress(progress, 100, f"Memproses baris {row_num + 1} dari {total_rows}...")
             
             excel_row = row_num + START_ROW_DATA #Hitung posisi row di Excel (row_num dari DataFrame + START_ROW_DATA)
             
-            # Ambil image path dan status dari data row
+            #Ambil image path dan status dari data row
             image_path = row_data['Image Path']
             status = row_data['Status']
             
-            # Gunakan format berbeda untuk Not OK rows
-            # Jika Not OK, gunakan format merah. Jika OK, gunakan format normal
+            #Gunakan format berbeda untuk Not OK rows
+            #Jika Not OK, gunakan format merah. Jika OK, gunakan format normal
             cell_format = not_ok_format if status == 'Not OK' else center_format
             datetime_format = not_ok_datetime_format if status == 'Not OK' else datetime_center_format
 
-            # Write kolom 'No' (nomor urut)
+            #Write kolom 'No' (nomor urut)
             try:
                 worksheet.write(excel_row, 0, row_data['No'], cell_format)
             except Exception:
-                # Fallback jika ada error, gunakan row_num + 1
+                #Fallback jika ada error, gunakan row_num + 1
                 worksheet.write(excel_row, 0, row_num + 1, cell_format)
             
             worksheet.write(excel_row, 1, '', cell_format) #Write kolom 'Image' (placeholder kosong, gambar akan di-insert terpisah)
             
-            # Insert image jika ada
-            # Cek apakah file image benar-benar exist di path yang tersimpan
+            #Insert image jika ada
+            #Cek apakah file image benar-benar exist di path yang tersimpan
             if os.path.exists(image_path):
                 temp_dir = tempfile.gettempdir() #Gunakan temp directory untuk simpan thumbnail hasil resize
 
-                # Generate nama file thumbnail yang unik (include PID dan row_num)
+                #Generate nama file thumbnail yang unik (include PID dan row_num)
                 thumbnail_filename = f"app_temp_thumb_{os.getpid()}_{row_num}.png"
                 thumbnail_path = os.path.join(temp_dir, thumbnail_filename)
                 
                 temp_files_to_clean.append(thumbnail_path) #Tambahkan ke list cleanup (akan dihapus setelah selesai)
                 
                 try:
-                    # Hitung max width untuk kolom B dalam pixel
-                    # 30 characters * 7 pixels per character (approx)
+                    #Hitung max width untuk kolom B dalam pixel
+                    #30 characters * 7 pixels per character (approx)
                     max_col_b_px = int(30 * 7)
                     
                     target_row_max_height = 150 #Target max height untuk row (dalam pixel)
 
-                    # Load gambar dan konversi ke RGB
-                    # Convert RGB diperlukan untuk ensure 3 channels (tanpa alpha)
+                    #Load gambar dan konversi ke RGB
+                    #Convert RGB diperlukan untuk ensure 3 channels (tanpa alpha)
                     img = Image.open(image_path).convert("RGB")
 
-                    # Draw detected label pada gambar
-                    # ImageDraw untuk menggambar text dan shape di image
+                    #Draw detected label pada gambar
+                    #ImageDraw untuk menggambar text dan shape di image
                     draw = ImageDraw.Draw(img)
                     
-                    # Load font untuk text (arial 30pt)
+                    #Load font untuk text (arial 30pt)
                     try:
                         font = ImageFont.truetype("arial.ttf", 30)
                     except IOError:
-                        # Fallback ke default font jika arial.ttf tidak ada
+                        #Fallback ke default font jika arial.ttf tidak ada
                         font = ImageFont.load_default()
 
                     text_display = f"Detected: {row_data['Label']}" #Text yang akan ditampilkan di gambar
 
-                    # Hitung bounding box untuk text (untuk background rectangle)
-                    # Position text di bottom-left image (x=10, y=height-50)
+                    #Hitung bounding box untuk text (untuk background rectangle)
+                    #Position text di bottom-left image (x=10, y=height-50)
                     bbox = draw.textbbox((10, img.height - 50), text_display, font=font)
                     
-                    # Draw semi-transparent black rectangle sebagai background text
-                    # Padding 5px dari text bbox
+                    #Draw semi-transparent black rectangle sebagai background text
+                    #Padding 5px dari text bbox
                     draw.rectangle([bbox[0]-5, bbox[1]-5, bbox[2]+5, bbox[3]+5], fill=(0, 0, 0, 100))
                     
-                    # Draw text berwarna kuning di atas background hitam
+                    #Draw text berwarna kuning di atas background hitam
                     draw.text((15, img.height - 50), text_display, fill=(255, 255, 0), font=font)
 
-                    # Calculate scaling untuk fit dalam Excel cell
-                    # Prioritas: fit height terlebih dahulu
+                    #Calculate scaling untuk fit dalam Excel cell
+                    #Prioritas: fit height terlebih dahulu
                     width_percent = (target_row_max_height / float(img.size[1]))
                     target_width = int(float(img.size[0]) * width_percent)
                     target_height = target_row_max_height
 
-                    # Jika setelah scale height, width melebihi max column width
-                    # Scale ulang berdasarkan width
+                    #Jika setelah scale height, width melebihi max column width
+                    #Scale ulang berdasarkan width
                     if target_width > max_col_b_px:
                         scale = max_col_b_px / float(img.size[0])
                         target_width = max_col_b_px
                         target_height = int(float(img.size[1]) * scale)
 
-                    # Set row height untuk accommodate image
-                    # Row height dalam points (1 point ≈ 1.33 pixels)
+                    #Set row height untuk accommodate image
+                    #Row height dalam points (1 point ≈ 1.33 pixels)
                     worksheet.set_row(excel_row, target_height)
                     
-                    # Resize dan save thumbnail
-                    # Resampling method dari config (biasanya LANCZOS untuk quality terbaik)
+                    #Resize dan save thumbnail
+                    #Resampling method dari config (biasanya LANCZOS untuk quality terbaik)
                     img_resized = img.resize((target_width, target_height), Resampling)
                     img_resized.save(thumbnail_path, format='PNG')
 
-                    # Calculate offset untuk center image di cell
-                    # Offset X: center horizontal dalam kolom B
+                    #Calculate offset untuk center image di cell
+                    #Offset X: center horizontal dalam kolom B
                     x_offset = max(0, (max_col_b_px - target_width) // 2 + 5)
-                    # Offset Y: center vertical dalam row
+                    #Offset Y: center vertical dalam row
                     y_offset = max(0, (target_row_max_height - target_height) // 2)
 
-                    # Insert image ke Excel di kolom B (index 1) pada row yang sesuai
-                    # x_scale dan y_scale = 1 berarti no additional scaling
-                    # x_offset dan y_offset untuk positioning dalam cell
+                    #Insert image ke Excel di kolom B (index 1) pada row yang sesuai
+                    #x_scale dan y_scale = 1 berarti no additional scaling
+                    #x_offset dan y_offset untuk positioning dalam cell
                     worksheet.insert_image(excel_row, 1, thumbnail_path, {'x_scale': 1, 'y_scale': 1, 'x_offset': x_offset, 'y_offset': y_offset})
                 
                 except Exception as img_e:
-                    # Jika ada error saat process/insert image, print warning
-                    # Tapi proses export tetap lanjut (tidak critical error)
+                    #Jika ada error saat process/insert image, print warning
+                    #Tapi proses export tetap lanjut (tidak critical error)
                     print(f"Warning: Gagal memproses atau menyisipkan gambar untuk baris {row_num}: {img_e}")
                 
-            # Write data columns lainnya
-            # Kolom C: Label (kode battery yang terdeteksi)
+            #Write data columns lainnya
+            #Kolom C: Label (kode battery yang terdeteksi)
             worksheet.write(excel_row, 2, row_data['Label'], cell_format)
             
-            # Kolom D: Date/Time (timestamp dengan format datetime)
+            #Kolom D: Date/Time (timestamp dengan format datetime)
             worksheet.write_datetime(excel_row, 3, row_data['Date/Time'], datetime_format)
             
-            # Kolom E: Standard (JIS/DIN)
+            #Kolom E: Standard (JIS/DIN)
             worksheet.write(excel_row, 4, row_data['Standard'], cell_format)
             
-            # Kolom F: Status (OK/Not OK)
+            #Kolom F: Status (OK/Not OK)
             worksheet.write(excel_row, 5, row_data['Status'], cell_format)
             
-            # Kolom G: Image Path (hidden column - untuk reference jika perlu)
+            #Kolom G: Image Path (hidden column - untuk reference jika perlu)
             worksheet.write(excel_row, 6, row_data['Image Path'], cell_format)
             
-            # Kolom H: Target Session (hidden column - untuk reference jika perlu)
+            #Kolom H: Target Session (hidden column - untuk reference jika perlu)
             worksheet.write(excel_row, 7, row_data['Target Session'], cell_format)
 
         update_progress(90, 100, "Menyimpan file Excel...")
         
-        writer.close() # Close Excel writer
+        writer.close() #Close Excel writer
 
         update_progress(95, 100, "Membersihkan file temporary...")
 
-        # Cleanup temporary files
-        # Hapus semua file thumbnail yang dibuat selama proses
+        #Cleanup temporary files
+        #Hapus semua file thumbnail yang dibuat selama proses
         for t_path in temp_files_to_clean:
             if os.path.exists(t_path):
                 try:
                     os.remove(t_path)
                 except:
-                    # Jika gagal hapus (file locked), skip saja
+                    #Jika gagal hapus (file locked), skip saja
                     pass
 
         update_progress(100, 100, "Export selesai!")
         return output_path #Return path file Excel yang berhasil dibuat
 
     except Exception as e:
-        # Jika terjadi error di proses manapun, print error message
+        #Jika terjadi error di proses manapun, print error message
         print(f"Export error: {e}")
         
         update_progress(100, 100, f"Error: {e}")
         
-        # Cleanup temp files jika terjadi error
-        # Penting untuk cleanup walau error untuk hindari file sampah
+        #Cleanup temp files jika terjadi error
+        #Penting untuk cleanup walau error untuk hindari file sampah
         for t_path in temp_files_to_clean:
             if os.path.exists(t_path):
                 try:

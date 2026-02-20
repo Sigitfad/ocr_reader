@@ -76,11 +76,11 @@ PRESETS = ["JIS", "DIN"]  #Daftar preset yang tersedia | Format kode yang bisa d
 #Contoh JIS: 26A17, 28B19L, 50D23R(S)
 PATTERNS = {
     "JIS": r"\b\d{2,3}[A-H]\d{2,3}[LR]?(?:\(S\))?\b",
-    # DIN pattern support semua format:
-    # - LBN 1/2/3
-    # - LN0-LN6 tanpa kapasitas
-    # - LN0-LN6 + kapasitas: LN4 776A, LN4 776A ISS, LN4 650A, LN6 1000A
-    # - Reverse format: [angka]LN[0-6] contoh: 650LN4, 1000LN6
+    #DIN pattern support semua format:
+    #LBN 1/2/3
+    #LN0-LN6 tanpa kapasitas
+    #LN0-LN6 + kapasitas: LN4 776A, LN4 776A ISS, LN4 650A, LN6 1000A
+    #Reverse format: [angka]LN[0-6] contoh: 650LN4, 1000LN6
     "DIN": r"(?:LBN\s*\d|LN[0-6](?:\s+\d{2,4}[A-Z]?(?:\s+ISS)?)?|\d{2,4}LN[0-6])"
 }
 

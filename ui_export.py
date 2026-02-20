@@ -1,4 +1,4 @@
-# Komponen UI dan fungsi terkait export data ke Excel
+#Komponen UI dan fungsi terkait export data ke Excel
 from PySide6.QtWidgets import (
     QDialog, QWidget, QVBoxLayout, QHBoxLayout, QGroupBox, QLabel, QPushButton,
     QRadioButton, QCheckBox, QComboBox, QDateEdit, QMessageBox, QCompleter
@@ -21,24 +21,24 @@ def create_export_dialog(parent, logic, preset_combo, jis_type_combo):
         QMessageBox.information(parent, "Info", "Tidak ada data !")
         return None
 
-    # Buat dialog dengan ukuran COMPACT seperti di foto
+    #Buat dialog dengan ukuran compact
     dialog = QDialog(parent)
     dialog.setWindowTitle("EXPORT DATA OPTION")
     dialog.setFixedSize(300, 350)  # Ukuran lebih kecil dan compact
     
-    # Main layout
+    #Main layout
     main_layout = QVBoxLayout(dialog)
     main_layout.setSpacing(6)  # Spacing lebih kecil
     main_layout.setContentsMargins(10, 10, 10, 10)
 
-    # FIXED: Simpan export_range_var sebagai attribute dialog agar bisa diakses dari luar
+    #Simpan export_range_var sebagai attribute dialog agar bisa diakses dari luar
     dialog._export_range_value = "Today"
 
     def set_range(r):
         dialog._export_range_value = r
         toggle_selectors()
 
-    # Style untuk GroupBox - TANPA background putih, border tipis seperti foto
+    #Style untuk GroupBox - TANPA background putih, border tipis seperti foto
     group_style = """
         QGroupBox {
             border: 1px solid #999;
@@ -74,11 +74,11 @@ def create_export_dialog(parent, logic, preset_combo, jis_type_combo):
         }
     """
 
-    # ===== ROW 1: Date (kiri) dan Pilih Tipe dan Label (kanan) =====
+    #ROW 1: Date (kiri) dan Pilih Tipe dan Label (kanan)
     top_row = QHBoxLayout()
     top_row.setSpacing(6)
     
-    # KOLOM KIRI: Date
+    #KOLOM KIRI: Date
     date_group = QGroupBox("Date")
     date_group.setFont(QFont("Arial", 9, QFont.Bold))
     date_group.setStyleSheet(group_style)
@@ -98,7 +98,7 @@ def create_export_dialog(parent, logic, preset_combo, jis_type_combo):
     
     top_row.addWidget(date_group, 1)
     
-    # KOLOM KANAN: Pilih Tipe dan Label
+    #KOLOM KANAN: Pilih Tipe dan Label
     preset_group = QGroupBox("Pilih Tipe dan Label")
     preset_group.setFont(QFont("Arial", 9, QFont.Bold))
     preset_group.setStyleSheet(group_style)
@@ -106,7 +106,7 @@ def create_export_dialog(parent, logic, preset_combo, jis_type_combo):
     preset_layout.setSpacing(5)
     preset_layout.setContentsMargins(8, 8, 8, 8)
     
-    # Tipe row
+    #Tipe row
     tipe_row = QHBoxLayout()
     tipe_row.setSpacing(5)
     tipe_label = QLabel("Tipe:")
@@ -148,13 +148,13 @@ def create_export_dialog(parent, logic, preset_combo, jis_type_combo):
     tipe_row.addWidget(export_preset_combo)
     preset_layout.addLayout(tipe_row)
     
-    # Checkbox Pilih Label - default otomatis terceklis
+    #Checkbox Pilih Label - default otomatis terceklis
     export_label_filter_enabled = QCheckBox("Pilih Label")
     export_label_filter_enabled.setStyleSheet("font-size: 12px;")
     export_label_filter_enabled.setChecked(True)
     preset_layout.addWidget(export_label_filter_enabled)
     
-    # Label dropdown
+    #Label dropdown
     export_label_type_combo = QComboBox()
     export_label_type_combo.setStyleSheet(combo_style)
     
@@ -195,11 +195,11 @@ def create_export_dialog(parent, logic, preset_combo, jis_type_combo):
     
     main_layout.addLayout(top_row)
     
-    # Connect radio buttons
+    #Connect radio buttons
     rb_today.toggled.connect(lambda: set_range("Today") if rb_today.isChecked() else None)
     rb_all.toggled.connect(lambda: set_range("All") if rb_all.isChecked() else None)
 
-    # ===== ROW 2: Pilih Bulan (dengan checkbox di kiri) =====
+    #ROW 2: Pilih Bulan (dengan checkbox di kiri)
     month_group = QGroupBox("Pilih Bulan")
     month_group.setFont(QFont("Arial", 9, QFont.Bold))
     month_group.setStyleSheet(group_style)
@@ -207,12 +207,12 @@ def create_export_dialog(parent, logic, preset_combo, jis_type_combo):
     month_layout.setContentsMargins(8, 12, 8, 8)
     month_layout.setSpacing(6)
     
-    # Checkbox untuk enable/disable pilihan bulan
+    #Checkbox untuk enable/disable pilihan bulan
     cb_month = QCheckBox()
     cb_month.setStyleSheet("font-size: 12px;")
     month_layout.addWidget(cb_month)
     
-    # Month combo
+    #Month combo
     current_year = datetime.now().year
     years = [str(y) for y in range(current_year, current_year - 5, -1)]
 
@@ -229,7 +229,7 @@ def create_export_dialog(parent, logic, preset_combo, jis_type_combo):
     month_combo.setDisabled(True)
     month_layout.addWidget(month_combo)
 
-    # Year combo
+    #Year combo
     year_combo = QComboBox()
     year_combo.setStyleSheet(combo_style)
     year_combo.addItems(years)
@@ -239,7 +239,7 @@ def create_export_dialog(parent, logic, preset_combo, jis_type_combo):
     
     main_layout.addWidget(month_group)
 
-    # ===== ROW 3: Pilih Tanggal (dengan checkbox di kiri) =====
+    #ROW 3: Pilih Tanggal (dengan checkbox di kiri)
     date_range_group = QGroupBox("Pilih Tanggal")
     date_range_group.setFont(QFont("Arial", 9, QFont.Bold))
     date_range_group.setStyleSheet(group_style)
@@ -247,12 +247,12 @@ def create_export_dialog(parent, logic, preset_combo, jis_type_combo):
     date_range_layout.setContentsMargins(8, 12, 8, 8)
     date_range_layout.setSpacing(6)
     
-    # Checkbox untuk enable/disable pilihan tanggal
+    #Checkbox untuk enable/disable pilihan tanggal
     cb_custom = QCheckBox()
     cb_custom.setStyleSheet("font-size: 12px;")
     date_range_layout.addWidget(cb_custom)
     
-    # Start date
+    #Start date
     start_date_entry = QDateEdit()
     start_date_entry.setStyleSheet(date_style)
     start_date_entry.setCalendarPopup(True)
@@ -261,12 +261,12 @@ def create_export_dialog(parent, logic, preset_combo, jis_type_combo):
     start_date_entry.setDisabled(True)
     date_range_layout.addWidget(start_date_entry)
     
-    # Dash label
+    #Dash label
     dash_label = QLabel(" ──")
     dash_label.setStyleSheet("font-size: 13px; font-weight: bold; color: black;")
     date_range_layout.addWidget(dash_label)
     
-    # End date
+    #End date
     end_date_entry = QDateEdit()
     end_date_entry.setStyleSheet(date_style)
     end_date_entry.setCalendarPopup(True)
@@ -277,64 +277,62 @@ def create_export_dialog(parent, logic, preset_combo, jis_type_combo):
     
     main_layout.addWidget(date_range_group)
 
-    # ===== LOGIKA CHECKBOX =====
-    # Fungsi untuk handle checkbox "Pilih Bulan"
+    #Fungsi untuk handle checkbox "Pilih Bulan"
     def on_month_checkbox_toggled(checked):
         if checked:
-            # Jika diceklis, pilih "Semua Data" dan disable "Data Hari Ini"
+            #Jika diceklis, pilih "Semua Data" dan disable "Data Hari Ini"
             rb_all.setChecked(True)
             rb_today.setEnabled(False)
-            # Aktifkan combo bulan/tahun
+            #Aktifkan combo bulan/tahun
             month_combo.setEnabled(True)
             year_combo.setEnabled(True)
-            # Nonaktifkan checkbox "Pilih Tanggal"
+            #Nonaktifkan checkbox "Pilih Tanggal"
             cb_custom.setChecked(False)
             set_range("Month")
         else:
-            # Jika unchecked, enable kembali "Data Hari Ini"
+            #Jika unchecked, enable kembali "Data Hari Ini"
             rb_today.setEnabled(True)
-            # Nonaktifkan combo bulan/tahun
+            #Nonaktifkan combo bulan/tahun
             month_combo.setEnabled(False)
             year_combo.setEnabled(False)
-            # Kembali ke "Data Hari Ini" jika tidak ada pilihan lain
+            #Kembali ke "Data Hari Ini" jika tidak ada pilihan lain
             if not cb_custom.isChecked():
                 rb_today.setChecked(True)
                 set_range("Today")
     
-    # Fungsi untuk handle checkbox "Pilih Tanggal"
+    #Fungsi untuk handle checkbox "Pilih Tanggal"
     def on_custom_checkbox_toggled(checked):
         if checked:
-            # Jika diceklis, pilih "Semua Data" dan disable "Data Hari Ini"
+            #Jika diceklis, pilih "Semua Data" dan disable "Data Hari Ini"
             rb_all.setChecked(True)
             rb_today.setEnabled(False)
-            # Aktifkan date pickers
+            #Aktifkan date pickers
             start_date_entry.setEnabled(True)
             end_date_entry.setEnabled(True)
-            # Nonaktifkan checkbox "Pilih Bulan"
+            #Nonaktifkan checkbox "Pilih Bulan"
             cb_month.setChecked(False)
             set_range("CustomDate")
         else:
-            # Jika unchecked, enable kembali "Data Hari Ini"
+            #Jika unchecked, enable kembali "Data Hari Ini"
             rb_today.setEnabled(True)
-            # Nonaktifkan date pickers
+            #Nonaktifkan date pickers
             start_date_entry.setEnabled(False)
             end_date_entry.setEnabled(False)
-            # Kembali ke "Data Hari Ini" jika tidak ada pilihan lain
+            #Kembali ke "Data Hari Ini" jika tidak ada pilihan lain
             if not cb_month.isChecked():
                 rb_today.setChecked(True)
                 set_range("Today")
     
-    # Connect checkbox signals
+    #Connect checkbox signals
     cb_month.toggled.connect(on_month_checkbox_toggled)
     cb_custom.toggled.connect(on_custom_checkbox_toggled)
 
-    # ===== Toggle Function (updated untuk support checkbox) =====
+    #Toggle Function (updated untuk support checkbox)
     def toggle_selectors():
-        # Fungsi ini sekarang tidak perlu melakukan apa-apa
-        # karena logika sudah di-handle oleh checkbox toggled
+
         pass
 
-    # ===== EXPORT BUTTON (BIRU BESAR seperti di foto) =====
+    #export button style
     export_btn = QPushButton("EXPORT DATA")
     export_btn.setStyleSheet("""
         QPushButton {
@@ -358,11 +356,11 @@ def create_export_dialog(parent, logic, preset_combo, jis_type_combo):
     
     main_layout.addWidget(export_btn)
 
-    # Store references - FIXED: Gunakan _export_range_value attribute
+    #Store references - Gunakan _export_range_value attribute
     dialog.export_preset_combo = export_preset_combo
     dialog.export_label_filter_enabled = export_label_filter_enabled
     dialog.export_label_type_combo = export_label_type_combo
-    # export_range_var tidak perlu lagi karena sudah ada di dialog._export_range_value
+    #export_range_var tidak perlu lagi karena sudah ada di dialog._export_range_value
     dialog.export_btn = export_btn
     dialog.month_combo = month_combo
     dialog.year_combo = year_combo

@@ -16,10 +16,6 @@ import os
 import numpy as np
 from difflib import SequenceMatcher
 
-# ============================================================
-# PASTE langsung DIN_TYPES dari config.py di sini
-# (supaya script bisa jalan tanpa import config)
-# ============================================================
 DIN_TYPES = [
     "Select Label . . .",
     "LBN 1", "LBN 2", "LBN 3", "LN1", "LN2", "LN3", "LN4",
@@ -32,15 +28,13 @@ DIN_TYPES = [
 
 ALLOWLIST_DIN = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ '
 
-# ============================================================
-# KOREKSI STRUKTUR DIN (copy dari ocr.py)
-# ============================================================
+#KOREKSI STRUKTUR DIN (copy dari ocr.py)
 def correct_din_structure(text):
     text = text.strip().upper()
     text = re.sub(r'[^A-Z0-9\s]', '', text)
     text = re.sub(r'\s+', ' ', text).strip()
 
-    # Insert spasi jika token menempel
+    #Insert spasi jika token menempel
     text = re.sub(r'^(LBN)(\d)', r'\1 \2', text)
     text = re.sub(r'^(LN\d)(\d)', r'\1 \2', text)
     text = re.sub(r'([A-Z0-9])\s*(ISS)$', r'\1 ISS', text)
@@ -102,12 +96,12 @@ def find_best_din_match(detected_text):
     corrected = correct_din_structure(detected_text)
     clean = corrected.replace(' ', '').upper()
 
-    # Exact match
+    #Exact match
     for din in DIN_TYPES[1:]:
         if clean == din.replace(' ', '').upper():
             return din, 1.0, corrected
 
-    # Fuzzy match
+    #Fuzzy match
     best_match, best_score = None, 0.0
     for din in DIN_TYPES[1:]:
         target = din.replace(' ', '').upper()
@@ -116,7 +110,7 @@ def find_best_din_match(detected_text):
             best_score = score
             best_match = din
 
-    # Fallback tanpa ISS
+    #Fallback tanpa ISS
     if not best_match or best_score < 0.90:
         clean_no_iss = re.sub(r'ISS$', '', clean)
         for din in DIN_TYPES[1:]:
@@ -129,9 +123,6 @@ def find_best_din_match(detected_text):
     return best_match, best_score, corrected
 
 
-# ============================================================
-# MAIN DEBUG
-# ============================================================
 def debug_image(image_path):
     print("\n" + "="*60)
     print(f"FILE: {image_path}")
@@ -145,7 +136,7 @@ def debug_image(image_path):
     h, w = frame.shape[:2]
     print(f"Ukuran gambar: {w}x{h}")
 
-    # Resize jika terlalu besar
+    #Resize jika terlalu besar
     if w > 640:
         scale = 640 / w
         frame = cv2.resize(frame, (640, int(h * scale)))
@@ -153,7 +144,7 @@ def debug_image(image_path):
 
     gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
 
-    # Preprocessing stages (SAMA dengan JIS)
+    #Preprocessing stages (SAMA dengan JIS)
     kernel = np.array([[-1,-1,-1],[-1,9,-1],[-1,-1,-1]])
     stages = {
         'Sharpened':    cv2.filter2D(gray, -1, kernel),
@@ -206,7 +197,7 @@ def debug_image(image_path):
         except Exception as e:
             print(f"  ERROR pada stage {stage_name}: {e}")
 
-    # Ringkasan akhir
+    #Ringkasan akhir
     print("\n" + "="*60)
     print("RINGKASAN - Semua teks yang terbaca OCR:")
     print("="*60)
@@ -236,10 +227,10 @@ def debug_image(image_path):
 
 if __name__ == "__main__":
     if len(sys.argv) > 1:
-        # Path diberikan lewat argumen command line
+        #Path diberikan lewat argumen command line
         image_path = sys.argv[1]
     else:
-        # Minta input dari user
+        #Minta input dari user
         print("="*60)
         print("DEBUG SCRIPT - DIN Battery Code Detection")
         print("="*60)

@@ -1,79 +1,72 @@
-import os #Digunakan untuk mengakses dan mengelola file/folder di sistem operasi
-import re #Digunakan untuk pencocokan pola teks (regex), misalnya validasi kode atau format tertentu
-import numpy as np #Digunakan untuk pengolahan array dan perhitungan numerik, terutama data gambar
-import cv2 #Library OpenCV untuk pengolahan citra dan video (resize, threshold, edge detection, dll)
-from datetime import datetime #Digunakan untuk mengambil dan mengelola tanggal serta waktu saat ini
-from config import Resampling #Digunakan untuk metode resampling gambar (misalnya LANCZOS / ANTIALIAS)
+import os #untuk mengakses dan mengelola file/folder di sistem operasi
+import re #untuk pencocokan pola teks (regex), misalnya validasi kode atau format tertentu
+import numpy as np #untuk pengolahan array dan perhitungan numerik, terutama data gambar
+import cv2 #untuk pengolahan citra dan video (resize, threshold, edge detection, dll)
+from datetime import datetime #untuk mengambil dan mengelola tanggal serta waktu saat ini
+from config import Resampling #untuk metode resampling gambar (misalnya LANCZOS / ANTIALIAS)
 
-#Suppress OpenCV error messages untuk camera index out of range
-#Ini mencegah spam error message saat aplikasi scan untuk kamera
+#ini mencegah spam error message saat aplikasi scan untuk kamera
 os.environ['OPENCV_LOG_LEVEL'] = 'ERROR'
 os.environ['OPENCV_VIDEOIO_DEBUG'] = '0'
 cv2.setLogLevel(0)  # 0 = Silent, 1 = Error, 2 = Warning, 3 = Info, 4 = Debug
 
 #LANCZOS / ANTIALIAS adalah metode resampling gambar yang digunakan saat resize
-#Fungsinya untuk menjaga kualitas dan ketajaman gambar, terutama teks, agar hasil OCR lebih akurat dan tidak pecah
+#fungsinya untuk menjaga kualitas dan ketajaman gambar, terutama teks, agar hasil OCR lebih akurat dan tidak pecah
 
 def apply_edge_detection(frame):
-    """
-    Fungsi untuk menerapkan Edge Detection pada frame dengan garis putih neon terang
-    Tujuan: Deteksi tepi objek dan teks dengan background HITAM PEKAT MURNI dan garis putih neon
-    Parameter: frame = numpy array BGR frame dari OpenCV
-    Return: numpy array frame edge detection dalam format BGR (3 channel)
-    
-    Menggunakan algoritma Canny Edge Detection dengan background pure black (0,0,0)
-    """
-    #Konversi frame BGR ke grayscale untuk memudahkan deteksi tepi
-    #Grayscale diperlukan karena algoritma Canny bekerja pada single channel
+    #untuk menerapkan Edge Detection pada frame dengan garis putih neon terang
+
+    #konversi frame BGR ke grayscale untuk memudahkan deteksi tepi
+    #grayscale diperlukan karena algoritma Canny bekerja pada single channel
     gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
     
-    #Apply Gaussian Blur untuk mengurangi noise
-    #Kernel size (3,3) digunakan untuk menghaluskan gambar sebelum deteksi tepi
-    #Sigma=0 berarti OpenCV akan menghitung nilai sigma otomatis
+    #apply Gaussian Blur untuk mengurangi noise
+    #kernel size (3,3) digunakan untuk menghaluskan gambar sebelum deteksi tepi
+    #sigma=0 berarti OpenCV akan menghitung nilai sigma otomatis
     blurred = cv2.GaussianBlur(gray, (3, 3), 0)
     
-    #Canny Edge Detection dengan threshold lebih rendah untuk lebih banyak detail
-    #Threshold 30-100: nilai rendah untuk mendeteksi lebih banyak edge/tepi
-    #Threshold rendah = lebih sensitif, menangkap detail lebih banyak
+    #canny Edge Detection dengan threshold lebih rendah untuk lebih banyak detail
+    #threshold 30-100: nilai rendah untuk mendeteksi lebih banyak edge/tepi
+    #threshold rendah = lebih sensitif, menangkap detail lebih banyak
     edges = cv2.Canny(blurred, 30, 100)
     
-    #Dilate edges untuk membuat garis lebih tebal dan terang
-    #Kernel 2x2 digunakan untuk memperlebar/menebalkan garis edge
-    #Iterations=1 berarti dilasi dilakukan 1 kali untuk membuat garis lebih terlihat
+    #dilate edges untuk membuat garis lebih tebal dan terang
+    #kernel 2x2 digunakan untuk memperlebar/menebalkan garis edge
+    #iterations=1 berarti dilasi dilakukan 1 kali untuk membuat garis lebih terlihat
     kernel = np.ones((2, 2), np.uint8)
     edges_dilated = cv2.dilate(edges, kernel, iterations=1)
     
-    #CRITICAL: Buat canvas HITAM MURNI (pure black) terlebih dahulu
-    #Ini memastikan background benar-benar hitam pekat tanpa noise abu-abu
+    #buat canvas HITAM MURNI (pure black) terlebih dahulu
+    #ini memastikan background benar-benar hitam pekat tanpa noise abu-abu
     #np.zeros membuat array dengan semua nilai 0 (hitam murni RGB 0,0,0)
-    #Shape: tinggi x lebar x 3 channel (BGR) dengan tipe data uint8 (0-255)
+    #shape: tinggi x lebar x 3 channel (BGR) dengan tipe data uint8 (0-255)
     edges_bgr = np.zeros((edges_dilated.shape[0], edges_dilated.shape[1], 3), dtype=np.uint8)
     
-    #HANYA gambar garis putih pada pixel yang terdeteksi sebagai edge
-    #Background tetap hitam murni (0,0,0), hanya edge yang jadi putih (255,255,255)
-    #Indexing boolean: pixel dengan nilai > 0 dari edges_dilated diisi putih [255,255,255]
-    #Hasilnya: garis putih neon terang hanya di tepi objek, background tetap hitam
-    edges_bgr[edges_dilated > 0] = [255, 255, 255]  # BGR: Putih murni hanya di edge
+    #gambar garis putih pada pixel yang terdeteksi sebagai edge
+    #background tetap hitam murni (0,0,0), hanya edge yang jadi putih (255,255,255)
+    #indexing boolean: pixel dengan nilai > 0 dari edges_dilated diisi putih [255,255,255]
+    #hasilnya: garis putih neon terang hanya di tepi objek, background tetap hitam
+    edges_bgr[edges_dilated > 0] = [255, 255, 255]  #BGR: putih murni hanya di edge
     
-    #OPTIONAL: Tingkatkan brightness garis putih jika perlu lebih terang
-    #Uncomment baris di bawah untuk garis lebih glowing
+    #tingkatkan brightness garis putih jika perlu lebih terang
+    #uncomment baris di bawah untuk garis lebih glowing
     #edges_bgr[edges_dilated > 0] = [255, 255, 255]
     
-    return edges_bgr #Return frame edge detection dalam format BGR 3 channel
+    return edges_bgr #return frame edge detection dalam format BGR 3 channel
 
 
-# === OCR CORRECTION LOGIC ===
+#ocr correction logic
 def fix_common_ocr_errors_jis(text):
-    #Bersihkan text: trim whitespace dan konversi ke uppercase
-    #Strip menghapus spasi di awal/akhir, upper() untuk konsistensi huruf kapital
+    #bersihkan text: trim whitespace dan konversi ke uppercase
+    #strip menghapus spasi di awal/akhir, upper() untuk konsistensi huruf kapital
     text = text.strip().upper()
     
-    #Hapus semua karakter selain huruf A-Z, angka 0-9, dan tanda kurung ()
-    #Regex [^A-Z0-9()] = ambil semua KECUALI yang disebutkan, lalu replace dengan ''
+    #hapus semua karakter selain huruf A-Z, angka 0-9, dan tanda kurung ()
+    #regex [^A-Z0-9()] = ambil semua kecuali yang disebutkan, lalu replace dengan ''
     text = re.sub(r'[^A-Z0-9()]', '', text)
 
-    #Dictionary mapping karakter yang sering salah dibaca OCR menjadi angka yang benar
-    #Misalnya: huruf O sering terbaca sebagai angka 0, I sebagai 1, dst
+    #dictionary mapping karakter yang sering salah dibaca OCR menjadi angka yang benar
+    #misalnya: huruf O sering terbaca sebagai angka 0, I sebagai 1, dst
     char_to_digit = {
         "O": "0", "Q": "0", "D": "0", "U": "0", "C": "0",  # Mirip angka 0
         "I": "1", "L": "1", "J": "1",  # Mirip angka 1
@@ -82,46 +75,62 @@ def fix_common_ocr_errors_jis(text):
         "B": "8", "P": "9", "R": "9"  # Mirip angka 8,9
     }
 
-    #Dictionary mapping angka yang sering salah dibaca menjadi huruf yang benar
-    #Untuk koreksi posisi yang seharusnya huruf tapi terbaca angka
+    #dictionary mapping angka yang sering salah dibaca menjadi huruf yang benar
+    #untuk koreksi posisi yang seharusnya huruf tapi terbaca angka
     digit_to_char = {
         "0": "D", "1": "L", "2": "Z", "3": "B", "4": "A", "5": "S", 
         "6": "G", "7": "T", "8": "B", "9": "R", "D" : "G"
     }
 
-    #Regex pattern untuk mendeteksi struktur kode JIS battery
-    #Pattern: (capacity)(type)(size)(terminal)(option)
-    #Contoh: 55D23L atau 75D23R(S)
+    #regex pattern untuk mendeteksi struktur kode JIS battery
+    #pattern: (capacity)(type)(size)(terminal)(option)
+    #contoh: 55D23L atau 75D23R(S)
     match = re.search(r'(\d+|[A-Z]+)(\d+|[A-Z])(\d+|[A-Z]+)([L|R|1|0|4|D|I]?)(\(S\)|5\)|S)?$', text)
 
-    #Jika pattern JIS terdeteksi, lakukan koreksi per-bagian
+    #jika pattern JIS terdeteksi, lakukan koreksi per-bagian
     if match:
-        #Extract setiap komponen dari pattern yang terdeteksi
-        capacity = match.group(1)  #Kapasitas baterai (biasanya angka)
-        type_char = match.group(2) #Tipe baterai (huruf)
-        size = match.group(3) #Ukuran baterai (angka)
-        terminal = match.group(4) #Terminal orientation (L/R)
-        option = match.group(5)  #Option seperti (S)
+        #extract setiap komponen dari pattern yang terdeteksi
+        capacity = match.group(1)  #kapasitas baterai (biasanya angka)
+        type_char = match.group(2) #tipe baterai (huruf)
+        size = match.group(3) #ukuran baterai (angka)
+        terminal = match.group(4) #terminal orientation (L/R)
+        option = match.group(5)  #option seperti (S)
 
-        #Koreksi capacity: ubah huruf yang salah dibaca jadi angka
-        #Join = gabungkan karakter hasil mapping kembali jadi string
+        #koreksi capacity: ubah huruf yang salah dibaca jadi angka
+        #join = gabungkan karakter hasil mapping kembali jadi string
         new_capacity = "".join([char_to_digit.get(c, c) for c in capacity])
         
-        #Koreksi type character: jika terbaca angka, ubah ke huruf yang benar
+        #koreksi type character: jika terbaca angka, ubah ke huruf yang benar
         if type_char.isdigit():
             new_type = digit_to_char.get(type_char, type_char)
         else:
             new_type = type_char
         
-        #Koreksi spesifik untuk tipe D, B, A yang sering salah dibaca
+        #koreksi spesifik untuk tipe D, B, A yang sering salah dibaca
         if new_type in ['O', 'Q', 'G', '0', 'U', 'C']: new_type = 'D'
         if new_type in ['8', '3']: new_type = 'B'
         if new_type in ['4']: new_type = 'A'
 
-        #Koreksi size: ubah huruf yang salah dibaca jadi angka
-        new_size = "".join([char_to_digit.get(c, c) for c in size])
+        #koreksi size: ubah huruf yang salah dibaca jadi angka
+        #ini juga handle huruf yang tidak ada di char_to_digit tapi mirip angka
+        #contoh: "2OR" -> O dikonversi ke "0" lewat char_to_digit, R tetap sebagai terminal
+        size_digit_only = ''
+        size_extra_terminal = ''
+        for idx_c, c in enumerate(size):
+            if c.isdigit():
+                size_digit_only += c
+            elif c in char_to_digit:
+                size_digit_only += char_to_digit[c]
+            elif c in ['L', 'R'] and idx_c >= len(size) - 1 and not terminal:
+                #huruf L/R di akhir size mungkin terminal yang menempel
+                size_extra_terminal = c
+            else:
+                size_digit_only += c
+        new_size = size_digit_only
+        if size_extra_terminal and not terminal:
+            terminal = size_extra_terminal
 
-        #Koreksi terminal orientation (L atau R)
+        #koreksi terminal orientation (L atau R)
         #L = Left terminal, R = Right terminal
         if terminal:
             if terminal in ['1', 'I', 'J', '4']: 
@@ -129,56 +138,51 @@ def fix_common_ocr_errors_jis(text):
             elif terminal in ['0', 'Q', 'D', 'O']: 
                 terminal = 'R'  # Karakter mirip R
 
-        #Koreksi option: pastikan format (S) yang benar
+        #koreksi option: pastikan format (S) yang benar
         if option:
             option = '(S)'
 
-        #Gabungkan semua komponen yang sudah dikoreksi
+        #gabungkan semua komponen yang sudah dikoreksi
         text_fixed = f"{new_capacity}{new_type}{new_size}{terminal}{option if option else ''}"
         return text_fixed.strip().upper()
 
-    #Jika pattern tidak cocok, lakukan koreksi sederhana
-    #Replace semua karakter sesuai mapping char_to_digit
+    #jika pattern tidak cocok, lakukan koreksi sederhana
+    #replace semua karakter sesuai mapping char_to_digit
     for char, digit in char_to_digit.items():
         text = text.replace(char, digit)
     
-    #Koreksi khusus untuk option (S)
+    #koreksi khusus untuk option (S)
     text = text.replace('5)', '(S)').replace('(5)', '(S)')
     return text.strip().upper()
 
 
 def fix_common_ocr_errors_din(text):
-    # FIXED: Perbaikan besar untuk deteksi DIN yang selalu gagal
-    # Masalah lama: 'S'->5, 'B'->8, 'G'->6 merusak kode seperti "ISS", "LBN", dll
-    # Sekarang: koreksi dilakukan secara kontekstual per posisi karakter
+    #koreksi dilakukan berdasarkan urutan atau letak huruf/karakter tersebut berada
     
     text = text.strip().upper()
     
-    # Hapus karakter selain A-Z, 0-9, dan spasi
+    #hapus karakter selain A-Z, 0-9, dan spasi
     text = re.sub(r'[^A-Z0-9\s]', '', text)
     
-    # Normalisasi multiple spasi
+    #normalisasi multiple spasi
     text = re.sub(r'\s+', ' ', text).strip()
     
-    # ===== TAHAP 1: Deteksi dan pisahkan token yang menempel (tanpa spasi) =====
-    # OCR sering membaca "LN4776A" atau "LBN1" sebagai satu token
-    # Coba insert spasi ke posisi yang benar berdasarkan pattern
+    #tahap 1: deteksi dan pisahkan token yang menempel (tanpa spasi)
+    #ocr sering membaca "LN4776A" atau "LBN1" sebagai satu token
+    #coba insert spasi ke posisi yang benar berdasarkan pattern
     
-    # Pattern: prefix (LBN atau LN+digit) diikuti langsung angka
-    text = re.sub(r'^(LBN)(\d)', r'\1 \2', text)         # LBN1 -> LBN 1
-    text = re.sub(r'^(LN\d)(\d)', r'\1 \2', text)         # LN4776A -> LN4 776A
-    # REMOVED: Jangan balik reverse format (XXXLNx) ke forward (LNx XXX)
-    # Konsistensi dengan ocr.py yang treat reverse format as-is untuk match ke DIN_TYPES
-    # text = re.sub(r'^(\d+[A-Z]?)(LN\d)', r' ', text)  # DIHAPUS - konflik
-    # text = re.sub(r'^(\d+[A-Z]?)(LBN\d)', r' ', text) # DIHAPUS - konflik
-    
-    # Insert spasi sebelum ISS jika tidak ada spasi
+    #pattern: prefix (LBN atau LN+digit) diikuti langsung angka
+    text = re.sub(r'^(LBN)(\d)', r'\1 \2', text)         #LBN1 -> LBN 1
+    text = re.sub(r'^(LN\d)(\d)', r'\1 \2', text)         #LN4776A -> LN4 776A
+    #konsistensi dengan ocr.py yang treat reverse format as-is untuk match ke DIN_TYPES
+
+    #insert spasi sebelum ISS jika tidak ada spasi
     text = re.sub(r'([A-Z0-9])(ISS)$', r'\1 \2', text)
     
-    # Normalisasi spasi lagi setelah insert
+    #normalisasi spasi lagi setelah insert
     text = re.sub(r'\s+', ' ', text).strip()
     
-    # Split menjadi token untuk koreksi per posisi
+    #split menjadi token untuk koreksi per posisi
     tokens = text.split()
     
     if len(tokens) == 0:
@@ -187,18 +191,18 @@ def fix_common_ocr_errors_din(text):
     corrected_tokens = []
     
     for i, token in enumerate(tokens):
-        # ===== TOKEN PERTAMA: Prefix tipe (LBN, LN0-LN4) =====
+        #prefix tipe (LBN, LN0-LN4)
         if i == 0:
             corrected = ""
             for j, char in enumerate(token):
                 if j == 0:
-                    # Harus 'L': koreksi 1/I/l yang mirip L
+                    #harus 'L': koreksi 1/I/l yang mirip L
                     if char in ['1', 'I', 'l']:
                         corrected += 'L'
                     else:
                         corrected += char
                 elif j == 1:
-                    # Harus 'B' atau 'N'
+                    #harus 'B' atau 'N'
                     if char == '8':
                         corrected += 'B'   # 8 mirip B (untuk LBN)
                     elif char in ['H', 'M', 'I1']:
@@ -206,16 +210,16 @@ def fix_common_ocr_errors_din(text):
                     else:
                         corrected += char
                 elif j == 2:
-                    # Posisi 3: untuk LBN -> harus 'N', untuk LN -> harus digit
-                    prefix_so_far = corrected  # 'LB' atau 'LN'
+                    #posisi 3: untuk LBN -> harus 'N', untuk LN -> harus digit
+                    prefix_so_far = corrected  #'LB' atau 'LN'
                     if prefix_so_far == 'LB':
-                        # Harus 'N'
+                        #harus 'N'
                         if char in ['H', 'M']:
                             corrected += 'N'
                         else:
                             corrected += char
                     else:
-                        # LN + digit: ubah huruf mirip angka ke angka
+                        #LN + digit: ubah huruf mirip angka ke angka
                         digit_map = {'O': '0', 'Q': '0', 'I': '1', 'L': '1', 'Z': '2', 'S': '5', 'G': '6', 'B': '8'}
                         corrected += digit_map.get(char, char)
                 else:
@@ -223,9 +227,9 @@ def fix_common_ocr_errors_din(text):
             
             corrected_tokens.append(corrected)
         
-        # ===== TOKEN KEDUA: Kapasitas angka + suffix huruf opsional (contoh: 776A, 295A, 60) =====
+        #kapasitas angka + suffix huruf opsional (contoh: 776A, 295A, 60)
         elif i == 1:
-            # Koreksi karakter di posisi ini: angka di awal, huruf suffix di akhir
+            #koreksi karakter di posisi ini: angka di awal, huruf suffix di akhir
             digit_map = {'O': '0', 'Q': '0', 'I': '1', 'L': '1', 'Z': '2', 'S': '5', 'G': '6', 'B': '8'}
             
             corrected = ""
@@ -234,11 +238,11 @@ def fix_common_ocr_errors_din(text):
                 if char.isdigit():
                     corrected += char
                 elif is_last and char.isalpha():
-                    # Karakter terakhir bisa suffix huruf (A, dll) - pertahankan
+                    #karakter terakhir bisa suffix huruf (A, dll) - pertahankan
                     if char in ['4']:
-                        corrected += 'A'   # 4 mirip A
+                        corrected += 'A'   #4 mirip A
                     else:
-                        corrected += char  # Pertahankan huruf suffix (A, B, C, dst)
+                        corrected += char  #pertahankan huruf suffix (A, B, C, dst)
                 elif char in digit_map:
                     corrected += digit_map[char]
                 else:
@@ -246,10 +250,10 @@ def fix_common_ocr_errors_din(text):
             
             corrected_tokens.append(corrected)
         
-        # ===== TOKEN KETIGA: Standard marker (ISS, EFB, AGM, dll) =====
+        #standard marker (ISS, EFB, AGM, dll)
         elif i == 2:
             corrected = token
-            # Koreksi untuk ISS yang sering salah dibaca
+            #koreksi untuk ISS yang sering salah dibaca
             token_normalized = token.replace('5', 'S').replace('1', 'I').replace('0', 'O')
             if token_normalized == 'ISS' or token in ['I55', 'IS5', 'I5S', '155', 'ISS']:
                 corrected = 'ISS'
@@ -259,86 +263,72 @@ def fix_common_ocr_errors_din(text):
         else:
             corrected_tokens.append(token)
     
-    # Gabungkan kembali
+    #gabungkan kembali
     result = ' '.join(corrected_tokens)
     
-    # Final cleanup: normalisasi spasi
+    #final cleanup: normalisasi spasi
     result = re.sub(r'\s+', ' ', result).strip()
     
     return result
 
 
 def fix_common_ocr_errors(text, preset):
-    # Fungsi dispatcher: pilih fungsi koreksi sesuai preset baterai
-    # JIS = Japanese Industrial Standard (format: 55D23L)
-    # DIN = Deutsche Industrie Norm (format: LBN 60 ISS)
+    #fungsi dispatcher: pilih fungsi koreksi sesuai preset baterai
+    #JIS =Japanese Industrial Standard (format: 55D23L)
+    #DIN =Deutsche Industrie Norm (format: LBN 60 ISS)
     if preset == "JIS":
         return fix_common_ocr_errors_jis(text)
     elif preset == "DIN":
         return fix_common_ocr_errors_din(text)
     else:
-        # Default ke JIS jika preset tidak dikenali
+        #default ke JIS jika preset tidak dikenali
         return fix_common_ocr_errors_jis(text)
 
 
-# === FRAME PROCESSING ===
+#frame processing
 def convert_frame_to_binary(frame):
-    """
-    UPDATED: Gunakan edge detection dengan putih neon untuk export Excel
-    """
-    # Konversi frame menjadi binary edge detection
-    # Digunakan saat export ke Excel untuk gambar lebih jelas
-    # Return: frame dengan background hitam dan garis putih neon
+    #gunakan edge detection dengan putih neon untuk export excel
     return apply_edge_detection(frame)
 
 def get_camera_name(index):
-    """
-    Fungsi untuk mendapatkan nama device kamera yang sebenarnya
-    Tujuan: Mendapatkan nama kamera seperti "Logitech C920" bukan hanya "Camera 1"
-    Parameter: index (int) - index kamera yang ingin dicek
-    Return: string nama kamera atau None jika tidak bisa dideteksi
-    
-    Support multi-platform:
-    - Windows: menggunakan pygrabber atau WMI
-    - Linux: membaca dari /sys/class/video4linux/
-    - macOS: menggunakan system_profiler
-    """
+    #untuk mendapatkan nama device kamera yang sebenarnya
+
     import platform
     system = platform.system()
     
     try:
         if system == "Windows":
-            # === WINDOWS: Gunakan WMI (Windows Management Instrumentation) ===
+            #windows: gunakan WMI (Windows Management Instrumentation)
             try:
                 import subprocess
-                # Gunakan PowerShell untuk query WMI
+                #gunakan powershell untuk query WMI
                 cmd = 'powershell "Get-WmiObject Win32_PnPEntity | Where-Object {$_.Caption -match \'camera|webcam\'} | Select-Object Caption"'
                 result = subprocess.check_output(cmd, shell=True, timeout=3).decode('utf-8', errors='ignore')
                 
-                # Parse hasil untuk mendapatkan daftar kamera
+                #parse hasil untuk mendapatkan daftar kamera
                 cameras = []
                 for line in result.split('\n'):
                     line = line.strip()
                     if line and not line.startswith('-') and line != 'Caption':
                         cameras.append(line)
                 
-                # Return kamera sesuai index jika ada
+                #return kamera sesuai index jika ada
                 if 0 <= index < len(cameras):
                     return cameras[index]
             except:
-                # Fallback: gunakan registry atau device manager
+                #fallback: gunakan registry atau device manager
                 try:
                     import winreg
-                    # Coba baca dari registry
+                    #coba baca dari registry
                     key_path = r"SOFTWARE\Microsoft\Windows\CurrentVersion\MMDevices\Audio\Capture"
-                    # Ini hanya contoh, untuk video devices path berbeda
-                    # Fallback ke None jika gagal
+                    #ini hanya contoh, untuk video devices path berbeda
+                    #fallback ke None jika gagal
                     pass
                 except:
                     pass
         
         elif system == "Linux":
-            # === LINUX: Baca dari /sys/class/video4linux/ ===
+            #linux: baca dari /sys/class/video4linux/
             try:
                 device_path = f"/sys/class/video4linux/video{index}/name"
                 if os.path.exists(device_path):
@@ -347,7 +337,7 @@ def get_camera_name(index):
                         if name:
                             return name
                 
-                # Alternative: gunakan v4l2-ctl jika tersedia
+                #alternative: gunakan v4l2-ctl jika tersedia
                 import subprocess
                 result = subprocess.check_output(
                     ['v4l2-ctl', '--list-devices'], 
@@ -355,7 +345,7 @@ def get_camera_name(index):
                     timeout=2
                 ).decode('utf-8')
                 
-                # Parse output untuk mendapatkan nama device
+                #parse output untuk mendapatkan nama device
                 current_name = None
                 for line in result.split('\n'):
                     line = line.strip()
@@ -367,7 +357,7 @@ def get_camera_name(index):
                 pass
         
         elif system == "Darwin":  # macOS
-            # === macOS: Gunakan system_profiler ===
+            #macOS: gunakan system_profiler
             try:
                 import subprocess
                 result = subprocess.check_output(
@@ -375,90 +365,85 @@ def get_camera_name(index):
                     timeout=3
                 ).decode('utf-8')
                 
-                # Parse hasil untuk mendapatkan daftar kamera
+                #parse hasil untuk mendapatkan daftar kamera
                 cameras = []
                 for line in result.split('\n'):
                     line = line.strip()
                     if ':' in line and 'Camera' not in line:
-                        # Nama kamera biasanya di awal baris dengan format "Name:"
+                        #nama kamera biasanya di awal baris dengan format "Name:"
                         parts = line.split(':')
                         if len(parts) == 2 and parts[1].strip():
                             cameras.append(parts[0].strip())
                 
-                # Return kamera sesuai index jika ada
+                #return kamera sesuai index jika ada
                 if 0 <= index < len(cameras):
                     return cameras[index]
             except:
                 pass
     
     except Exception as e:
-        # Silent fail untuk semua error
+        #silent fail untuk semua error
         pass
     
-    # Return None jika tidak bisa mendapatkan nama
+    #return None jika tidak bisa mendapatkan nama
     return None
 
 
 def get_available_cameras(max_cameras=5):
-    """
-    Fungsi untuk mendapatkan list semua kamera yang tersedia
-    Tujuan: Deteksi semua kamera yang terhubung ke sistem untuk ditampilkan di dropdown
-    Parameter: max_cameras (int) - maksimal jumlah kamera yang akan di-scan
-    Return: list of dict dengan format [{'index': 0, 'name': 'Logitech C920 - 1920x1080', 'width': 1920, 'height': 1080}, ...]
-    """
+    #Fungsi untuk mendapatkan list semua kamera yang tersedia
     available_cameras = []
     
-    # Loop cek semua kamera dari index 0 hingga max_cameras-1
+    #loop cek semua kamera dari index 0 hingga max_cameras-1
     for i in range(max_cameras):
         cap = None
         try:
-            # Coba buka kamera pada index i dengan backend default
+            #coba buka kamera pada index i dengan backend default
             cap = cv2.VideoCapture(i, cv2.CAP_ANY)
             
-            # Timeout untuk mencegah hang
+            #timeout untuk mencegah hang
             cap.set(cv2.CAP_PROP_OPEN_TIMEOUT_MSEC, 1000)  # 1 detik timeout
             
-            # Cek apakah kamera berhasil dibuka
+            #cek apakah kamera berhasil dibuka
             if cap.isOpened():
-                # Coba baca 1 frame untuk validasi
+                #coba baca 1 frame untuk validasi
                 ret, test_frame = cap.read()
                 
                 if ret and test_frame is not None:
-                    # Ambil resolusi kamera
+                    #ambil resolusi kamera
                     w = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
                     h = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
                     
-                    # Validasi resolusi valid
+                    #validasi resolusi valid
                     if w > 0 and h > 0:
-                        # Coba dapatkan nama device yang sebenarnya
+                        #coba dapatkan nama device yang sebenarnya
                         device_name = get_camera_name(i)
                         
-                        # Buat nama kamera untuk ditampilkan
+                        #buat nama kamera untuk ditampilkan
                         if device_name:
-                            # Jika berhasil dapat nama device
+                            #jika berhasil dapat nama device
                             camera_name = f"{device_name} - {w}x{h}"
                         else:
-                            # Fallback ke format lama jika tidak bisa dapat nama
+                            #fallback ke format lama jika tidak bisa dapat nama
                             if i == 0:
                                 camera_name = f"Camera {i} (Internal) - {w}x{h}"
                             else:
                                 camera_name = f"Camera {i} (External) - {w}x{h}"
                         
-                        # Tambahkan ke list
+                        #tambahkan ke list
                         available_cameras.append({
                             'index': i,
                             'name': camera_name,
                             'width': w,
                             'height': h,
-                            'device_name': device_name  # Simpan juga nama device asli
+                            'device_name': device_name  #simpan juga nama device asli
                         })
         
         except Exception as e:
-            # Abaikan error dan lanjut ke kamera berikutnya
+            #abaikan error dan lanjut ke kamera berikutnya
             pass
         
         finally:
-            # Pastikan kamera ditutup
+            #pastikan kamera ditutup
             if cap is not None:
                 try:
                     cap.release()
@@ -468,84 +453,79 @@ def get_available_cameras(max_cameras=5):
     return available_cameras
 
 def find_external_camera(max_cameras=5):
-    # Fungsi untuk mencari kamera eksternal (bukan built-in laptop)
-    # Scan hingga max_cameras perangkat untuk menemukan kamera terbaik
-    # Priority: kamera eksternal (index > 0), fallback ke built-in (index 0)
+    #Fungsi untuk mencari kamera eksternal (bukan built-in laptop)
     
-    best_working_index = 0 #Default ke kamera pertama (biasanya built-in)
+    best_working_index = 0 #default ke kamera pertama (biasanya built-in)
 
-    # Loop cek semua kamera dari index 0 hingga max_cameras-1
+    #loop cek semua kamera dari index 0 hingga max_cameras-1
     for i in range(max_cameras):
         cap = None
         try:
-            # Coba buka kamera pada index i dengan backend default
-            # Gunakan CAP_ANY untuk kompatibilitas maksimal
+            #coba buka kamera pada index i dengan backend default
+            #gunakan CAP_ANY untuk kompatibilitas maksimal
             cap = cv2.VideoCapture(i, cv2.CAP_ANY)
             
-            # Timeout untuk mencegah hang - set max waktu tunggu
-            cap.set(cv2.CAP_PROP_OPEN_TIMEOUT_MSEC, 1000)  # 1 detik timeout
+            #timeout untuk mencegah hang - set max waktu tunggu
+            cap.set(cv2.CAP_PROP_OPEN_TIMEOUT_MSEC, 1000)  #1 detik timeout
             
-            # Cek apakah kamera berhasil dibuka
+            #cek apakah kamera berhasil dibuka
             if cap.isOpened():
-                # Coba baca 1 frame untuk validasi kamera benar-benar berfungsi
+                #coba baca 1 frame untuk validasi kamera benar-benar berfungsi
                 ret, test_frame = cap.read()
                 
                 if ret and test_frame is not None:
-                    # Ambil resolusi kamera (width x height)
+                    #ambil resolusi kamera (width x height)
                     w = cap.get(cv2.CAP_PROP_FRAME_WIDTH)
                     h = cap.get(cv2.CAP_PROP_FRAME_HEIGHT)
                     
-                    # Validasi kamera memiliki resolusi valid (w>0 dan h>0)
+                    #validasi kamera memiliki resolusi valid (w>0 dan h>0)
                     if w > 0 and h > 0:
-                        # Jika index > 0, ini kamera eksternal - langsung return
+                        #jika index > 0, ini kamera eksternal - langsung return
                         if i > 0:
                             cap.release()
                             return i
                         else:
-                            # Index 0 adalah built-in, simpan sebagai fallback
+                            #index 0 adalah built-in, simpan sebagai fallback
                             best_working_index = i
         
         except Exception as e:
-            # Tangkap semua error OpenCV dan abaikan
-            # Ini mencegah crash saat scan kamera yang tidak kompatibel
+            #tangkap semua error OpenCV dan abaikan
+            #ini mencegah crash saat scan kamera yang tidak kompatibel
             pass
         
         finally:
-            # Pastikan kamera selalu ditutup, bahkan jika terjadi error
+            #pastikan kamera selalu ditutup, bahkan jika terjadi error
             if cap is not None:
                 try:
                     cap.release()
                 except:
                     pass
     
-    return best_working_index #Return kamera terbaik yang ditemukan (prioritas eksternal, fallback built-in)
+    return best_working_index #return kamera terbaik yang ditemukan (prioritas eksternal, fallback built-in)
 
 
 def create_directories():
-    # Fungsi untuk membuat folder-folder yang dibutuhkan aplikasi
-    # Import config untuk ambil path folder IMAGE_DIR dan EXCEL_DIR
+    #fungsi untuk membuat folder-folder yang dibutuhkan aplikasi yaitu IMAGE_DIR dan EXCEL_DIR
     from config import IMAGE_DIR, EXCEL_DIR
     
-    # Buat folder untuk menyimpan gambar hasil capture
-    # exist_ok=True berarti tidak error jika folder sudah ada
+    #buat folder untuk menyimpan gambar hasil capture
     os.makedirs(IMAGE_DIR, exist_ok=True)
     
-    # Buat folder untuk menyimpan file Excel hasil export
+    #buat folder untuk menyimpan file Excel hasil export
     os.makedirs(EXCEL_DIR, exist_ok=True)
 
 
 def cleanup_temp_files(temp_files_list):
-    # Fungsi untuk membersihkan/menghapus file-file temporary
-    # Parameter: list berisi path file yang akan dihapus
+    #untuk membersihkan/menghapus file-file temporary
     
-    # Loop setiap path file dalam list
+    #loop setiap path file dalam list
     for t_path in temp_files_list:
-        # Cek apakah file benar-benar ada
+        #cek apakah file benar-benar ada
         if os.path.exists(t_path):
             try:
-                # Coba hapus file
+                #coba hapus file
                 os.remove(t_path)
             except:
-                # Jika gagal hapus (file locked/permission), abaikan error
-                # Pass = tidak melakukan apa-apa, lanjut ke file berikutnya
+                #jika gagal hapus (file locked/permission), abaikan error
+                #pass = tidak melakukan apa-apa, lanjut ke file berikutnya
                 pass

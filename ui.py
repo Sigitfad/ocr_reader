@@ -3,44 +3,40 @@ from PySide6.QtWidgets import (
     QPushButton, QLabel, QRadioButton, QCheckBox, QGroupBox, QSpinBox,
     QMessageBox, QFileDialog, QTreeWidget, QTreeWidgetItem, QHeaderView, QDialog,
     QComboBox, QDateEdit, QAbstractItemView, QCompleter, QFrame, QProgressDialog
-)  # PySide6 GUI components | UI widgets dan layouts
+)  #UI widgets dan layouts
 from PySide6.QtCore import (
     Qt, QTimer, Signal, QThread, QDateTime, QDate, QLocale, QMetaObject
-)  # PySide6 core | Core signal/slot dan threading
+)  #Core signal/slot dan threading
 from PySide6.QtGui import (
     QPixmap, QImage, QFont, QColor, QKeyEvent, QIcon
-)  # PySide6 GUI utilities | Untuk image handling dan styling
+)  #Untuk image handling dan styling
 from config import (
     APP_NAME, WINDOW_WIDTH, WINDOW_HEIGHT, CONTROL_PANEL_WIDTH, RIGHT_PANEL_WIDTH,
     JIS_TYPES, DIN_TYPES, MONTHS, MONTH_MAP
-)  # Import konfigurasi dari config.py
-from datetime import datetime  # Date/time operations | Modul untuk date/time
-from ui_setting import create_setting_dialog  # Import fungsi setting dialog | Fungsi untuk membuat setting dialog
-from ui_export import create_export_dialog  # Import fungsi export dialog | Fungsi untuk membuat export dialog
-import os  # File operations | Modul untuk file operations
-import subprocess  # Untuk membuka folder
-import platform  # Untuk deteksi OS
+)  #Import konfigurasi dari config.py
+from datetime import datetime  #Modul untuk date/time
+from ui_setting import create_setting_dialog  #Fungsi untuk membuat setting dialog
+from ui_export import create_export_dialog  #Fungsi untuk membuat export dialog
+import os  #Modul untuk file operations
+import subprocess  #Untuk membuka folder
+import platform  #Untuk deteksi OS
 
 
 class LogicSignals(QThread):
-    #Class wrapper QThread untuk DetectionLogic
-    #Tujuan: Wrapper untuk DetectionLogic instance dengan signal/slot capability
-    #Fungsi: Menyediakan interface komunikasi antara UI thread dan detection thread
+    #Menyediakan interface komunikasi antara UI thread dan detection thread
     
-    update_signal = Signal(object)  # Signal untuk update video frame | Emit ketika frame baru siap dari kamera
-    code_detected_signal = Signal(str)  # Signal untuk code detected | Emit ketika kode berhasil terdeteksi OCR
-    camera_status_signal = Signal(str, bool)  # Signal untuk camera status | Emit status kamera (on/off) dengan info
-    data_reset_signal = Signal()  # Signal untuk reset data | Emit untuk reset display saat ganti hari
-    all_text_signal = Signal(list)  # Signal untuk OCR text output | Emit list semua teks yang terdeteksi OCR
+    update_signal = Signal(object)  #Signal untuk update video frame
+    code_detected_signal = Signal(str)  #Signal untuk code detected atau ketika kode berhasil terdeteksi OCR
+    camera_status_signal = Signal(str, bool)  #Signal untuk camera status atau status kamera (on/off) dengan info
+    data_reset_signal = Signal()  #Signal untuk reset data atau untuk reset display "data barang" saat ganti hari
+    all_text_signal = Signal(list)  #Signal untuk OCR text output atau list semua teks yang terdeteksi OCR
 
     def __init__(self):
-        #Fungsi inisialisasi QThread
-        #Tujuan: Setup thread dan buat DetectionLogic instance
         #Fungsi: Membuat instance DetectionLogic dan menghubungkan semua signals
 
         super().__init__()
         from ocr import DetectionLogic
-        # Buat instance DetectionLogic dengan semua signals yang diperlukan
+        #Buat instance DetectionLogic dengan semua signals yang diperlukan
         self.logic = DetectionLogic(
             self.update_signal,
             self.code_detected_signal,
@@ -50,39 +46,32 @@ class LogicSignals(QThread):
         )
         
     def run(self):
-        #Fungsi jalankan thread
-        #Tujuan: Start thread event loop
         #Fungsi: Menjalankan Qt event loop untuk thread ini
         self.exec()
 
 
 class MainWindow(QMainWindow):
-    # Class jendela utama aplikasi | Tujuan: Main application window dengan semua UI components
+    #Class jendela utama aplikasi | Tujuan: Main application window dengan semua UI components
     
-    export_result_signal = Signal(str)  # Signal untuk export result | Emit hasil export file
-    export_status_signal = Signal(str, str)  # Signal untuk export status | Emit status export operation
-    export_progress_signal = Signal(str, str)  # Signal untuk export progress | Emit progress export (message, value)
-    file_scan_result_signal = Signal(str)  # Signal untuk file scan result | Emit hasil scan dari file
+    export_result_signal = Signal(str)  #Signal untuk hasil export file
+    export_status_signal = Signal(str, str)  #Signal untuk export status
+    export_progress_signal = Signal(str, str)  #Signal untuk export progress
+    file_scan_result_signal = Signal(str)  #Signal untuk hasil scan dari file
 
     def __init__(self):
-        """
-        Fungsi inisialisasi main window
-        Tujuan: Setup UI dan inisialisasi semua components
-        Fungsi: Membuat window, setup signals, dan inisialisasi semua UI elements
-        """
+        #Fungsi: Membuat window, setup signals, dan inisialisasi semua UI elements
+
         super().__init__()
-        self.setWindowTitle(APP_NAME)  # Set judul window dari config
-        self.setWindowIcon(QIcon("logo_gs.png"))  # Set icon aplikasi
+        self.setWindowTitle(APP_NAME)  #Set judul window dari config
+        self.setWindowIcon(QIcon("logo_gs.png"))  #Set icon aplikasi
         
-        # FIXED: Set minimum size dulu sebelum setGeometry untuk hindari warning
-        # Gunakan ukuran yang sedikit lebih kecil untuk fleksibilitas
+        #Gunakan ukuran yang sedikit lebih kecil untuk fleksibilitas
         self.setMinimumSize(1200, 650)  # Minimum size yang lebih fleksibel
         
-        # Set initial geometry
+        #Set initial geometry
         self.setGeometry(100, 100, WINDOW_WIDTH, WINDOW_HEIGHT)  # Set ukuran dan posisi window
         
-        # === BOOTSTRAP-STYLE BUTTON STYLES ===
-        # Modern, clean button styles inspired by Bootstrap framework
+        #clean style button
         self.BUTTON_STYLES = {
             'success': """
                 QPushButton {
@@ -176,37 +165,34 @@ class MainWindow(QMainWindow):
         
         self.is_fullscreen = False
         self.normal_geometry = None
-        self.logic_thread = None  # Instance LogicSignals thread | Akan diisi saat _setup_logic_thread
-        self.logic = None  # Instance DetectionLogic | Akan diisi saat _setup_logic_thread
-        self.progress_dialog = None  # Progress dialog untuk export | Akan diisi saat export
-        self.available_cameras = []  # List kamera yang tersedia | Akan diisi saat populate camera list
-        self._prev_camera_index = 0  # Index kamera sebelumnya untuk tracking changes
+        self.logic_thread = None  #Instance LogicSignals thread atau Akan diisi saat _setup_logic_thread
+        self.logic = None  #Instance DetectionLogic atau Akan diisi saat _setup_logic_thread
+        self.progress_dialog = None  #Progress dialog untuk export
+        self.available_cameras = []  #List kamera yang tersedia
+        self._prev_camera_index = 0  #Index kamera sebelumnya untuk tracking changes
         
-        # Connect internal signals untuk handling asynchronous operations
-        self.export_result_signal.connect(self._handle_export_result)  # Handle hasil export
-        self.export_status_signal.connect(self._update_export_button_ui)  # Update UI button export
-        self.file_scan_result_signal.connect(self._handle_file_scan_result)  # Handle hasil scan file
+        #Connect internal signals untuk handling asynchronous operations
+        self.export_result_signal.connect(self._handle_export_result)  #Handle hasil export
+        self.export_status_signal.connect(self._update_export_button_ui)  #Update UI button export
+        self.file_scan_result_signal.connect(self._handle_file_scan_result)  #Handle hasil scan file
 
-        self._setup_logic_thread(initial_setup=True)  # Setup thread pertama kali
+        self._setup_logic_thread(initial_setup=True)  #Setup thread pertama kali
         
-        self.setup_ui()  # Buat semua UI components
-        self.setup_timer()  # Setup timer untuk jam real-time
+        self.setup_ui()  #Buat semua UI components
+        self.setup_timer()  #Setup timer untuk jam real-time
     
     def _setup_logic_thread(self, initial_setup=False):
-        #Helper untuk membuat instance baru LogicSignals dan Logic, lalu menghubungkan sinyal
-        #Tujuan: Setup atau reset detection logic thread
-        #Fungsi: Membersihkan thread lama, membuat instance baru, dan connect semua signals
-        #Parameter: initial_setup (bool) - True jika setup pertama kali
+        #Membersihkan thread lama, membuat instance baru, dan connect semua signals
         
-        # Cleanup thread lama jika ada
+        #Cleanup thread lama jika ada
         if self.logic_thread:
             if self.logic:
-                 self.logic.stop_detection()  # Stop detection jika sedang berjalan
+                 self.logic.stop_detection()  #Stop detection jika sedang berjalan
             
             if self.logic_thread.isRunning():
-                 self.logic_thread.quit()  # Request thread untuk stop
-                 self.logic_thread.wait(5000)  # Wait maksimal 5 detik
-                 # Disconnect semua signals untuk mencegah memory leak
+                 self.logic_thread.quit()  #Request thread untuk stop
+                 self.logic_thread.wait(5000)  #Wait maksimal 5 detik
+                 #Disconnect semua signals untuk mencegah memory leak
                  try:
                      self.logic_thread.update_signal.disconnect(self.update_video_frame)
                      self.logic_thread.code_detected_signal.disconnect(self.handle_code_detection)
@@ -214,68 +200,59 @@ class MainWindow(QMainWindow):
                      self.logic_thread.data_reset_signal.disconnect(self.update_code_display)
                      self.logic_thread.all_text_signal.disconnect(self.update_all_text_display)
                  except TypeError:
-                     pass  # Ignore jika signal sudah disconnected
+                     pass  #Ignore jika signal sudah disconnected
                      
-            self.logic_thread = None  # Clear reference
-            self.logic = None  # Clear reference
+            self.logic_thread = None  #Clear reference
+            self.logic = None  #Clear reference
         
-        # Buat instance baru
-        self.logic_thread = LogicSignals()  # Buat thread wrapper baru
-        self.logic = self.logic_thread.logic  # Ambil reference ke DetectionLogic instance
+        #Buat instance baru
+        self.logic_thread = LogicSignals()  #Buat thread wrapper baru
+        self.logic = self.logic_thread.logic  #Ambil reference ke DetectionLogic instance
         
-        # Set camera index yang dipilih user (atau default)
+        #Set camera index yang dipilih user (atau default)
         if hasattr(self, 'camera_combo'):
-            # Jika camera combo sudah ada (bukan initial setup)
+            #Jika camera combo sudah ada (bukan initial setup)
             camera_index = self.camera_combo.currentData()
             if camera_index is not None:
                 self.logic.current_camera_index = camera_index
         
-        # Connect semua signals ke handler functions
-        self.logic_thread.update_signal.connect(self.update_video_frame)  # Update frame kamera
-        self.logic_thread.code_detected_signal.connect(self.handle_code_detection)  # Handle deteksi kode
-        self.logic_thread.camera_status_signal.connect(self.update_camera_status)  # Update status kamera
-        self.logic_thread.data_reset_signal.connect(self.update_code_display)  # Reset display data
-        self.logic_thread.all_text_signal.connect(self.update_all_text_display)  # Update OCR output
+        #Connect semua signals ke handler functions
+        self.logic_thread.update_signal.connect(self.update_video_frame)  #Update frame kamera
+        self.logic_thread.code_detected_signal.connect(self.handle_code_detection)  #Handle deteksi kode
+        self.logic_thread.camera_status_signal.connect(self.update_camera_status)  #Update status kamera
+        self.logic_thread.data_reset_signal.connect(self.update_code_display)  #Reset display data
+        self.logic_thread.all_text_signal.connect(self.update_all_text_display)  #Update OCR output
     
     def keyPressEvent(self, event: QKeyEvent):
-        """
-        Override method untuk handle keyboard input
-        Tujuan: Deteksi tombol F11 untuk toggle fullscreen mode
-        Fungsi: Toggle antara fullscreen dan normal mode seperti browser
-        Parameter: event - QKeyEvent object berisi info tombol yang ditekan
-        """
-        # Check apakah tombol yang ditekan adalah F11
+        #Fungsi: Toggle antara fullscreen dan normal mode seperti browser
+
+        #Check apakah tombol yang ditekan adalah F11
         if event.key() == Qt.Key.Key_F11:
             self.toggle_fullscreen()
         else:
-            # Pass event ke parent class untuk handling default
+            #Pass event ke parent class untuk handling default
             super().keyPressEvent(event)
     
     def toggle_fullscreen(self):
-        """
-        Fungsi untuk toggle fullscreen mode
-        Tujuan: Switch antara fullscreen dan normal window mode
-        Fungsi: Menyimpan/restore ukuran window dan toggle fullscreen
-        """
+        #Fungsi: Menyimpan/restore ukuran window dan toggle fullscreen
+
         if self.is_fullscreen:
-            # Keluar dari fullscreen - kembali ke mode normal
+            #Keluar dari fullscreen - kembali ke mode normal
             self.showNormal()
             
-            # FIXED: Restore minimum size (konsisten dengan __init__)
+            #Restore minimum size (konsisten dengan __init__)
             self.setMinimumSize(1200, 650)
             
-            # Restore ukuran dan posisi window sebelumnya
+            #Restore ukuran dan posisi window sebelumnya
             if self.normal_geometry:
                 self.setGeometry(self.normal_geometry)
             
             self.is_fullscreen = False
         else:
-            # Masuk ke fullscreen mode
-            # Simpan ukuran window normal sebelum fullscreen
+            #Masuk ke fullscreen mode dan Simpan ukuran window normal sebelum fullscreen
             self.normal_geometry = self.geometry()
             
-            # Set window menjadi fullscreen
-            # FIXED: Clear minimum size untuk avoid geometry warning
+            #Set window menjadi fullscreen
             self.setMinimumSize(0, 0)
             
             self.showFullScreen()
@@ -283,25 +260,22 @@ class MainWindow(QMainWindow):
             self.is_fullscreen = True
 
     def closeEvent(self, event):
-        # Menangani penutupan jendela (tombol X)
-        # MODIFIED: Tambah warning jika kamera sedang aktif
-        # Tujuan: Prevent user close app saat kamera masih running
-        # Fungsi: Validasi status kamera sebelum allow close
+        #Validasi status kamera sebelum allow close
 
-        # CHECK: Apakah kamera sedang aktif?
+        #Apakah kamera sedang aktif?
         if self.logic and self.logic.running:
-            # Kamera masih aktif - tampilkan warning
+            #Kamera masih aktif - tampilkan warning
             QMessageBox.warning(
                 self, 
                 'Warning !',
                 "Kamera sedang aktif!\nHarap STOP kamera terlebih dahulu sebelum keluar aplikasi!",
                 QMessageBox.Ok
             )
-            # Ignore close event - aplikasi tidak akan tertutup
+            #Ignore close event - aplikasi tidak akan tertutup
             event.ignore()
             return
         
-        # Kamera tidak aktif - tampilkan konfirmasi normal
+        #Kamera tidak aktif - tampilkan konfirmasi normal
         reply = QMessageBox.question(
             self, 
             'Quit Confirmation',
@@ -311,16 +285,16 @@ class MainWindow(QMainWindow):
         )
 
         if reply == QMessageBox.Yes:
-            # User konfirmasi keluar
+            #User konfirmasi keluar
             if self.logic:
-                self.logic.stop_detection()  # Pastikan stop detection
+                self.logic.stop_detection()  #Pastikan stop detection
             if self.logic_thread and self.logic_thread.isRunning():
-                self.logic_thread.quit()  # Quit thread
-                self.logic_thread.wait()  # Wait sampai thread selesai
-            event.accept()  # Accept close event
+                self.logic_thread.quit()  #Quit thread
+                self.logic_thread.wait()  #Wait sampai thread selesai
+            event.accept()  #Accept close event
         else:
-            # User cancel keluar
-            event.ignore()  # Ignore close event
+            #User cancel keluar
+            event.ignore()  #Ignore close event
 
     def setup_timer(self):
         #Mengatur timer untuk jam real-time dan pengecekan reset harian.
@@ -341,56 +315,50 @@ class MainWindow(QMainWindow):
         self.date_time_label.setText(formatted_time)
 
     def setup_ui(self):
-        #Fungsi setup seluruh UI aplikasi
-        #Tujuan: Create dan arrange semua UI components di window
         #Fungsi: Membuat layout utama dengan 3 panel (control, video, data)
 
-        main_widget = QWidget()  # Buat central widget
-        self.setCentralWidget(main_widget)  # Set sebagai central widget window
+        main_widget = QWidget()  #Buat central widget
+        self.setCentralWidget(main_widget)  #Set sebagai central widget window
         
-        main_layout = QHBoxLayout(main_widget)  # Buat horizontal layout utama
+        main_layout = QHBoxLayout(main_widget)  #Buat horizontal layout utama
         
-        # Panel kiri - Control panel dengan buttons dan settings
+        #Panel kiri - Control panel dengan buttons dan settings
         control_frame = self._create_control_panel()
         main_layout.addWidget(control_frame)
         
-        # Panel tengah - Video display dari kamera
+        #Panel tengah - Video display dari kamera
         self.video_label = QLabel("CAMERA OFF")  # Label untuk tampilkan video
         self.video_label.setAlignment(Qt.AlignCenter)  # Center alignment
         self.video_label.setStyleSheet("background-color: black; color: white; font-size: 14pt;")
         main_layout.addWidget(self.video_label, 1)  # Stretch factor 1 untuk expand
         
-        # Panel kanan - Data display dan export
+        #Panel kanan - Data display dan export
         right_panel = self._create_right_panel()
         main_layout.addWidget(right_panel)
 
-        # Set fixed width untuk side panels
+        #Set fixed width untuk side panels
         control_frame.setFixedWidth(CONTROL_PANEL_WIDTH)  # Fixed width control panel
         right_panel.setFixedWidth(RIGHT_PANEL_WIDTH)  # Fixed width data panel
 
     def _create_control_panel(self):
-        """
-        Fungsi buat panel kontrol - LAYOUT BARU sesuai panelkiri.PNG
-        Tujuan: Create left control panel dengan SETTING button dan controls yang disederhanakan
-        Fungsi: Membuat panel kiri dengan: SETTING button, Options, START/STOP, SCAN FROM FILE, Detection Output, Statistics
-        Return: QWidget - Widget panel kontrol yang sudah lengkap
-        """
+        #Fungsi: Membuat panel kiri dengan: SETTING button, Options, START/STOP, SCAN FROM FILE, Detection Output, Statistics
+
         frame = QWidget()
         layout = QVBoxLayout(frame)
         layout.setContentsMargins(15, 15, 15, 15)
         layout.setSpacing(10)
         
-        # === Hidden camera, preset, label combos (untuk dialog SETTING) ===
-        # Tetap buat combo boxes tapi hidden, karena referensi masih diperlukan di logic
+        #Hidden camera, preset, label combos (untuk dialog SETTING)
+        #Tetap buat combo boxes tapi hidden, karena referensi masih diperlukan di logic
         self.camera_combo = QComboBox()
         self._populate_camera_list()
         self.camera_combo.currentIndexChanged.connect(self._on_camera_selection_changed)
-        self.camera_combo.hide()  # Hidden - akan diakses via dialog SETTING
+        self.camera_combo.hide()  #Hidden - akan diakses via dialog SETTING
         
         self.preset_combo = QComboBox()
         self.preset_combo.addItems(["JIS", "DIN"])
         self.preset_combo.setCurrentIndex(0)
-        self.preset_combo.hide()  # Hidden - akan diakses via dialog SETTING
+        self.preset_combo.hide()  #Hidden - akan diakses via dialog SETTING
         
         self.jis_type_combo = QComboBox()
         self.jis_type_combo.addItems(JIS_TYPES)
@@ -398,9 +366,9 @@ class MainWindow(QMainWindow):
         self.jis_type_combo.setInsertPolicy(QComboBox.InsertPolicy.NoInsert)
         self.jis_type_combo.setCompleter(QCompleter(self.jis_type_combo.model()))
         self.jis_type_combo.currentTextChanged.connect(self.on_jis_type_changed)
-        self.jis_type_combo.hide()  # Hidden - akan diakses via dialog SETTING
+        self.jis_type_combo.hide()  #Hidden - akan diakses via dialog SETTING
         
-        # Connect signals untuk hidden combos
+        #Connect signals untuk hidden combos
         set_options = lambda: self.logic.set_camera_options(
             self.preset_combo.currentText(),
             False,
@@ -413,7 +381,7 @@ class MainWindow(QMainWindow):
         self.preset_combo.currentTextChanged.connect(set_options)
         self.preset_combo.currentTextChanged.connect(self._update_label_options)
         
-        # === SETTING BUTTON (BIRU) - membuka dialog setting ===
+        #membuka dialog setting
         self.btn_setting = QPushButton("SETTING")
         self.btn_setting.setStyleSheet("""
             QPushButton {
@@ -435,7 +403,7 @@ class MainWindow(QMainWindow):
         self.btn_setting.clicked.connect(self.open_setting_dialog)
         layout.addWidget(self.btn_setting)
         
-        # === Group Box untuk Options ===
+        #Group Box untuk Options
         options_group = QGroupBox("OPTION")
         options_group.setFont(QFont("Arial", 10, QFont.Bold))
         options_layout = QVBoxLayout(options_group)
@@ -469,26 +437,26 @@ class MainWindow(QMainWindow):
         options_layout.addWidget(self.cb_split)
         layout.addWidget(options_group)
         
-        # === Camera Control Button (START - HIJAU) ===
+        #Camera Control Button
         self.btn_camera_toggle = QPushButton("START")
         self.btn_camera_toggle.setStyleSheet(self.BUTTON_STYLES['success'])
         self.btn_camera_toggle.clicked.connect(self.toggle_camera)
         self.is_camera_running = False
         layout.addWidget(self.btn_camera_toggle)
         
-        # === Button untuk Scan dari File (BIRU) ===
+        #Button untuk Scan dari File
         self.btn_file = QPushButton("SCAN FROM FILE")
         self.btn_file.setStyleSheet(self.BUTTON_STYLES['primary'])
         self.btn_file.clicked.connect(self.open_file_scan_dialog)
         layout.addWidget(self.btn_file)
         
-        # === Container untuk Success Popup ===
+        #Container untuk Success Popup
         self.success_container = QWidget()
         self.success_layout = QVBoxLayout(self.success_container)
         self.success_container.setFixedHeight(50)
         layout.addWidget(self.success_container)
         
-        # === Group Box untuk Detection Output ===
+        #Group Box untuk Detection Output
         all_text_group = QGroupBox("OUTPUT TEXT")
         all_text_group.setFont(QFont("Arial", 9, QFont.Bold))
         all_text_layout = QVBoxLayout(all_text_group)
@@ -543,11 +511,11 @@ class MainWindow(QMainWindow):
         all_text_layout.addWidget(self.all_text_tree)
         layout.addWidget(all_text_group, 2)
         
-        # === Container Statistik di paling bawah ===
+        #Container Statistik di paling bawah
         self._create_statistics_container(layout)
         
-        # Hidden label untuk backward compatibility - tetap ada tapi tidak visible di UI
-        # Masih diperlukan oleh update_code_display() untuk update text
+        #Hidden label untuk backward compatibility - tetap ada tapi tidak visible di UI
+        #Masih diperlukan oleh update_code_display() untuk update text
         self.selected_type_label = QLabel("Pilih Label Terlebih Dahulu")
         self.selected_type_label.setFont(QFont("Arial", 9))
         self.selected_type_label.setStyleSheet("color: #FF6600; font-weight: normal; border: none;")
@@ -557,11 +525,9 @@ class MainWindow(QMainWindow):
         return frame
     
     def open_setting_dialog(self):
-        """
-        Fungsi untuk membuka dialog SETTING
-        Tujuan: Menampilkan dialog pengaturan camera, tipe, dan label
-        """
-        # Cegah buka dialog saat kamera aktif
+        #Fungsi untuk membuka dialog SETTING
+
+        #Cegah buka dialog saat kamera aktif
         if self.logic and self.logic.running:
             QMessageBox.warning(
                 self,
@@ -582,13 +548,9 @@ class MainWindow(QMainWindow):
             dialog.exec()
     
     def _create_statistics_container(self, parent_layout):
-        """
-        NEW METHOD: Buat container untuk statistik PERSIS seperti foto statistik.png
-        Tujuan: Menampilkan statistik dalam box-box terpisah (Label, Total, OK, NOT OK)
-        Fungsi: Membuat 4 box statistik dengan QGroupBox styling yang sama persis dengan foto
-        Parameter: parent_layout - Layout parent dimana container ini akan ditambahkan
-        """
-        # Buat outer GroupBox dengan title "STATISTIK" seperti di foto
+        #Membuat 4 box statistik dengan QGroupBox styling yang sama persis dengan foto
+
+        #Buat outer GroupBox dengan title "STATISTIK" seperti di foto
         outer_stats_box = QGroupBox("STATISTIK")
         outer_stats_box.setFont(QFont("Arial", 9, QFont.Bold))
         outer_stats_box.setStyleSheet("""
@@ -606,12 +568,12 @@ class MainWindow(QMainWindow):
             }
         """)
         
-        # Layout utama di dalam outer box
+        #Layout utama di dalam outer box
         stats_layout = QVBoxLayout(outer_stats_box)
         stats_layout.setContentsMargins(10, 15, 10, 10)
         stats_layout.setSpacing(8)
 
-        # ===== Box 1: LABEL =====
+        #Box 1: LABEL
         self.label_box = QGroupBox("LABEL")
         self.label_box.setFont(QFont("Arial", 8, QFont.Bold))
         self.label_box.setStyleSheet("""
@@ -637,7 +599,7 @@ class MainWindow(QMainWindow):
         self.label_display.setStyleSheet("border: none; color: blue;")
         label_box_layout.addWidget(self.label_display)
 
-        # ===== Box 2: TOTAL =====
+        #Box 2: TOTAL
         self.total_box = QGroupBox("TOTAL")
         self.total_box.setFont(QFont("Arial", 8, QFont.Bold))
         self.total_box.setStyleSheet("""
@@ -663,13 +625,13 @@ class MainWindow(QMainWindow):
         self.total_display.setStyleSheet("border: none; color: blue;")
         total_box_layout.addWidget(self.total_display)
 
-        # ===== Box 3 & 4: OK dan NOT OK (BOTTOM ROW) =====
+        #Box 3 & 4: OK dan NOT OK
         bottom_row = QWidget()
         bottom_layout = QHBoxLayout(bottom_row)
         bottom_layout.setContentsMargins(0, 0, 0, 0)
         bottom_layout.setSpacing(8)
 
-        # Box OK
+        #Box OK
         self.ok_box = QGroupBox("OK")
         self.ok_box.setFont(QFont("Arial", 8, QFont.Bold))
         self.ok_box.setStyleSheet("""
@@ -695,7 +657,7 @@ class MainWindow(QMainWindow):
         self.ok_display.setStyleSheet("border: none; color: blue;")
         ok_box_layout.addWidget(self.ok_display)
 
-        # Box NOT OK
+        #Box NOT OK
         self.not_ok_box = QGroupBox("NOT OK")
         self.not_ok_box.setFont(QFont("Arial", 8, QFont.Bold))
         self.not_ok_box.setStyleSheet("""
@@ -721,21 +683,20 @@ class MainWindow(QMainWindow):
         self.not_ok_display.setStyleSheet("border: none; color: blue;")
         not_ok_box_layout.addWidget(self.not_ok_display)
 
-        # Tambahkan OK dan NOT OK ke bottom row
+        #Tambahkan OK dan NOT OK ke bottom row
         bottom_layout.addWidget(self.ok_box)
         bottom_layout.addWidget(self.not_ok_box)
 
-        # Tambahkan semua ke stats layout
+        #Tambahkan semua ke stats layout
         stats_layout.addWidget(self.label_box)
         stats_layout.addWidget(self.total_box)
         stats_layout.addWidget(bottom_row)
 
-        # Tambahkan outer box ke parent layout
+        #Tambahkan outer box ke parent layout
         parent_layout.addWidget(outer_stats_box)
     def update_statistics_display(self, label_text, total_count, ok_count, not_ok_count):
-        """
-        Update tampilan statistik di container boxes
-        """
+        #Update tampilan statistik di container boxes
+
         self.label_display.setText(str(label_text))
         self.total_display.setText(str(total_count))
         self.ok_display.setText(str(ok_count))
@@ -743,59 +704,45 @@ class MainWindow(QMainWindow):
 
 
     def update_all_text_display(self, text_list):
-        """
-        Update list elemen teks yang terdeteksi
-        Tujuan: Tampilkan semua hasil OCR di tree widget
-        Fungsi: Clear tree dan populate dengan hasil OCR terbaru
-        Parameter: text_list (list) - List of strings dari OCR detection
-        """
-        self.all_text_tree.clear()  # Clear semua items
+        #Tampilkan semua hasil OCR di tree widget
+
+        self.all_text_tree.clear()  #Clear semua items
         for text in text_list:
-            item = QTreeWidgetItem([text])  # Buat tree item dengan text
-            self.all_text_tree.addTopLevelItem(item)  # Tambah ke tree
+            item = QTreeWidgetItem([text])  #Buat tree item dengan text
+            self.all_text_tree.addTopLevelItem(item)  #Tambah ke tree
 
 
     def _is_valid_label(self, label_text, current_preset):
-        """
-        Validasi apakah label yang diinput user valid sesuai dengan preset
-        Tujuan: Memastikan label yang diketik user ada dalam daftar valid
-        Fungsi: Check apakah label ada dalam JIS_TYPES atau DIN_TYPES
-        Parameter: 
-            label_text (str) - Label yang diinput user
-            current_preset (str) - Preset aktif ("JIS" atau "DIN")
-        Return: bool - True jika valid, False jika tidak valid
-        """
-        # Jika label kosong atau placeholder, return False
+        #Check apakah label ada dalam JIS_TYPES atau DIN_TYPES
+        
+        #Jika label kosong atau placeholder, return False
         if not label_text or label_text.strip() == "" or label_text == "Select Label...":
             return False
         
-        # Check berdasarkan preset aktif
+        #Check berdasarkan preset aktif
         if current_preset == "JIS":
-            # Check apakah label ada dalam daftar JIS_TYPES (skip index 0 yang merupakan placeholder)
+            #Check apakah label ada dalam daftar JIS_TYPES (skip index 0 yang merupakan placeholder)
             return label_text in JIS_TYPES[1:]
         elif current_preset == "DIN":
-            # Check apakah label ada dalam daftar DIN_TYPES (skip index 0 yang merupakan placeholder)
+            #Check apakah label ada dalam daftar DIN_TYPES (skip index 0 yang merupakan placeholder)
             return label_text in DIN_TYPES[1:]
         
-        return False  # Default return False jika preset tidak dikenali
+        return False  #Default return False jika preset tidak dikenali
 
     def on_jis_type_changed(self, text):
-        #Handler ketika user memilih JIS Type
-        #Tujuan: Update UI dan logic saat label berubah
-        #Fungsi: Validasi label, update display label, dan set target di logic
-        #Parameter: text (str) - Text dari combo box yang dipilih/diketik user
+        #Update UI dan logic saat label berubah
 
         current_preset = self.preset_combo.currentText()
 
         if not self._is_valid_label(text, current_preset):
             self.selected_type_label.setText("Pilih Label Terlebih Dahulu")
             self.selected_type_label.setStyleSheet("color: #FF6600; font-weight: normal; border: none;")
-            # NEW: Reset statistics display
+            #Reset statistics display
             self.update_statistics_display(". . .", 0, 0, 0)
             if self.logic:
                 self.logic.set_target_label("")
         else:
-            # Saat label valid dipilih, tampilkan "Selected: ..."
+            #Saat label valid dipilih, tampilkan "Selected: ..."
             self.selected_type_label.setText(f"Selected: {text}")
             self.selected_type_label.setStyleSheet("color: #28a745; font-weight: bold; border: none;")
             if self.logic:
@@ -804,42 +751,39 @@ class MainWindow(QMainWindow):
         self.update_code_display()
 
     def _create_right_panel(self):
-        #Fungsi buat panel kanan
-        #Tujuan: Create right panel dengan export button dan data display table
-        #Fungsi: Membuat panel untuk tampilkan data deteksi dan export controls
-        #Return: QWidget - Widget panel kanan yang sudah lengkap
+        #Membuat panel untuk tampilkan data deteksi dan export controls
 
-        frame = QWidget()  # Buat widget container
-        layout = QVBoxLayout(frame)  # Vertical layout
-        layout.setContentsMargins(15, 15, 15, 15)  # Set margins
+        frame = QWidget()  #Buat widget container
+        layout = QVBoxLayout(frame)  #Vertical layout
+        layout.setContentsMargins(15, 15, 15, 15)  #Set margins
         
-        # === Button untuk Export Data ===
+        #Button untuk Export Data
         self.btn_export = QPushButton("EXPORT DATA")
         self.btn_export.setStyleSheet(self.BUTTON_STYLES['primary'])
-        self.btn_export.clicked.connect(self.open_export_dialog)  # Connect ke export dialog
+        self.btn_export.clicked.connect(self.open_export_dialog)  #Connect ke export dialog
         layout.addWidget(self.btn_export)
         
-        # === Label untuk tampilkan Date/Time ===
-        self.date_time_label = QLabel("Memuat Tanggal...")  # Placeholder text
+        #Label untuk tampilkan Date/Time
+        self.date_time_label = QLabel("Memuat Tanggal...")  #Placeholder text
         self.date_time_label.setFont(QFont("Arial", 10))
         layout.addWidget(self.date_time_label)
         
-        # === Label Header untuk Data Barang ===
+        #Label Header untuk Data Barang
         label_barang = QLabel("Data Barang :")
         label_barang.setFont(QFont("Arial", 11, QFont.Bold))
         layout.addWidget(label_barang)
         
-        # === Tree Widget untuk tampilkan data deteksi ===
+        #Tree Widget untuk tampilkan data deteksi
         self.code_tree = QTreeWidget()
-        self.code_tree.setHeaderLabels(["Waktu", "Label", "Status", "Path Gambar", "ID"])  # Set headers
-        self.code_tree.setColumnCount(5)  # 5 kolom
-        self.code_tree.header().setDefaultAlignment(Qt.AlignCenter)  # Center alignment header
+        self.code_tree.setHeaderLabels(["Waktu", "Label", "Status", "Path Gambar", "ID"])  #Set headers
+        self.code_tree.setColumnCount(5)  #5 kolom
+        self.code_tree.header().setDefaultAlignment(Qt.AlignCenter)  #Center alignment header
         
-        # PERBAIKAN: Disable horizontal scroll dan pertipis vertical scrollbar
-        self.code_tree.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)  # Nonaktifkan scroll horizontal
-        self.code_tree.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)  # Scroll vertical hanya saat perlu
+        #Disable horizontal scroll dan pertipis vertical scrollbar
+        self.code_tree.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)  #Nonaktifkan scroll horizontal
+        self.code_tree.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)  #Scroll vertical hanya saat perlu
         
-        # Set stylesheet untuk pertipis scrollbar
+        #Set stylesheet untuk pertipis scrollbar
         self.code_tree.setStyleSheet("""
             QTreeWidget {
                 border: 1px solid #ddd;
@@ -866,38 +810,38 @@ class MainWindow(QMainWindow):
             }
         """)
         
-        # Set column widths dan resize modes
-        self.code_tree.setColumnWidth(0, 80)  # Column Waktu
+        #Set column widths dan resize modes
+        self.code_tree.setColumnWidth(0, 80)  #Column Waktu
         self.code_tree.header().setSectionResizeMode(0, QHeaderView.ResizeToContents)
-        self.code_tree.header().setSectionResizeMode(1, QHeaderView.Stretch)  # Column Label (stretch)
-        self.code_tree.header().setSectionResizeMode(2, QHeaderView.ResizeToContents)  # Column Status
-        self.code_tree.header().setSectionResizeMode(3, QHeaderView.Fixed)  # Column Path (hidden)
-        self.code_tree.header().setSectionResizeMode(4, QHeaderView.Fixed)  # Column ID (hidden)
+        self.code_tree.header().setSectionResizeMode(1, QHeaderView.Stretch)  #Column Label (stretch)
+        self.code_tree.header().setSectionResizeMode(2, QHeaderView.ResizeToContents)  #Column Status
+        self.code_tree.header().setSectionResizeMode(3, QHeaderView.Fixed)  #Column Path (hidden)
+        self.code_tree.header().setSectionResizeMode(4, QHeaderView.Fixed)  #Column ID (hidden)
 
-        self.code_tree.setSelectionMode(QAbstractItemView.MultiSelection)  # Allow multiple selection
+        self.code_tree.setSelectionMode(QAbstractItemView.MultiSelection)  #Allow multiple selection
 
-        # Hide kolom Path dan ID (untuk internal use saja)
+        #Hide kolom Path dan ID (untuk internal use saja)
         self.code_tree.setColumnHidden(3, True)
         self.code_tree.setColumnHidden(4, True)
         
-        # Connect double click ke view image
+        #Connect double click ke view image
         self.code_tree.itemDoubleClicked.connect(self.view_selected_image)
 
         layout.addWidget(self.code_tree)
         
-        # === Container untuk Button Actions (CLEAR dan REFRESH) ===
+        #Container untuk Button Actions (CLEAR dan REFRESH)
         action_buttons_container = QWidget()
         action_buttons_layout = QHBoxLayout(action_buttons_container)
         action_buttons_layout.setContentsMargins(0, 0, 0, 0)
         action_buttons_layout.setSpacing(8)
         
-        # === Button untuk Delete Selected Data ===
+        #Button untuk Delete Selected Data
         self.btn_delete_selected = QPushButton("CLEAR")
         self.btn_delete_selected.setStyleSheet(self.BUTTON_STYLES['danger'])
-        self.btn_delete_selected.clicked.connect(self.delete_selected_codes)  # Connect ke delete function
-        action_buttons_layout.addWidget(self.btn_delete_selected, 3)  # Stretch factor 3 - ambil lebih banyak ruang
+        self.btn_delete_selected.clicked.connect(self.delete_selected_codes)  #Connect ke delete function
+        action_buttons_layout.addWidget(self.btn_delete_selected, 3)  #Stretch factor 3 - ambil lebih banyak ruang
         
-        # === Button untuk Refresh Data (Icon Only - Square) ===
+        #Button untuk Refresh Data
         self.btn_refresh = QPushButton("⭮")  # Unicode arrow symbol
         self.btn_refresh.setStyleSheet("""
             QPushButton {
@@ -919,113 +863,96 @@ class MainWindow(QMainWindow):
                 background-color: #545b62;
             }
         """)
-        self.btn_refresh.clicked.connect(self.refresh_data_display)  # Connect ke refresh function
-        action_buttons_layout.addWidget(self.btn_refresh, 0)  # Stretch factor 0 - ukuran tetap
+        self.btn_refresh.clicked.connect(self.refresh_data_display)  #Connect ke refresh function
+        action_buttons_layout.addWidget(self.btn_refresh, 0)  #Stretch factor 0 - ukuran tetap
         
         layout.addWidget(action_buttons_container)
         
-        self.update_code_display()  # Initial populate data
+        self.update_code_display()  #Initial populate data
 
         return frame
 
     def _reset_file_scan_button(self):
-        """
-        Meriset teks dan status tombol 'Scan from File'
-        Tujuan: Reset button ke state default setelah scan selesai
-        Fungsi: Ubah text ke "SCAN FROM FILE" dan enable button
-        """
+        #Reset button ke state default setelah scan selesai
+
         self.btn_file.setText("SCAN FROM FILE")
         self.btn_file.setEnabled(True)
 
     def refresh_data_display(self):
-        """
-        Refresh data dari database dan update tampilan Data Barang
-        Tujuan: Menyegarkan tampilan jika ada data yang delay atau belum muncul
-        Fungsi: Reload data dari database dan update tree view dengan efek blink HANYA pada data items (header tetap)
-        """
+        #Refresh data dari database dan update tampilan Data Barang
+
         if not self.logic:
             QMessageBox.warning(self, "Warning", "Logic belum diinisialisasi. Silakan mulai kamera terlebih dahulu.")
             return
         
         try:
-            # Import fungsi load_existing_data dari database
+            #Import fungsi load_existing_data dari database
             from database import load_existing_data
             
-            # PERBAIKAN: Hanya hapus items, JANGAN clear() agar header tidak hilang
-            # Hapus semua top level items (data) tanpa menghapus header
+            #Hanya hapus items, JANGAN clear() agar header tidak hilang
+            #Hapus semua top level items (data) tanpa menghapus header
             while self.code_tree.topLevelItemCount() > 0:
                 self.code_tree.takeTopLevelItem(0)
             
-            # Reload data dari database untuk tanggal hari ini
+            #Reload data dari database untuk tanggal hari ini
             self.logic.detected_codes = load_existing_data(self.logic.current_date)
             
-            # Delay 100ms sebelum menampilkan data baru (efek blink)
+            #Delay 100ms sebelum menampilkan data baru (efek blink)
             QTimer.singleShot(100, lambda: self.update_code_display())
             
         except Exception as e:
-            # Jika ada error, langsung update display tanpa delay
+            #Jika ada error, langsung update display tanpa delay
             self.update_code_display()
             QMessageBox.critical(self, "Error Refresh", f"Gagal me-refresh data:\n{e}")
 
 
     def _lock_label_and_type_controls(self):
-        """
-        Nonaktifkan kontrol Label dan Tipe saat kamera START
-        Tujuan: Prevent user mengubah preset/label saat detection sedang berjalan
-        Fungsi: Disable preset combo dan label combo
-        """
+        #Nonaktifkan kontrol Label dan Tipe saat kamera START
+
         self.preset_combo.setEnabled(False)
         self.jis_type_combo.setEnabled(False)
 
     def _unlock_label_and_type_controls(self):
-        """
-        Aktifkan kembali kontrol Label dan Tipe saat kamera STOP
-        Tujuan: Allow user mengubah preset/label setelah detection berhenti
-        Fungsi: Enable preset combo dan label combo
-        """
+        #Aktifkan kembali kontrol Label dan Tipe saat kamera STOP
+
         self.preset_combo.setEnabled(True)
         self.jis_type_combo.setEnabled(True)
 
     def toggle_camera(self):
-        """
-        Handler untuk tombol toggle kamera (START/STOP)
-        Tujuan: Toggle antara start dan stop kamera dengan satu tombol
-        Fungsi: Cek status kamera dan jalankan start atau stop detection
-        """
+        #Handler untuk tombol toggle kamera (START/STOP)
+
         if not self.is_camera_running:
-            # Kamera sedang OFF, jalankan START
+            #Kamera sedang OFF, jalankan START
             self.start_detection()
         else:
-            # Kamera sedang ON, jalankan STOP
+            #Kamera sedang ON, jalankan STOP
             self.stop_detection()
 
     def start_detection(self):
         #Handler untuk memulai detection (dipanggil dari toggle_camera)
-        #Tujuan: Mulai camera detection dan OCR scanning
-        #Fungsi: Validasi label, setup logic thread, start detection, update UI
 
         import threading
         
-        # Ambil label yang dipilih
+        #Ambil label yang dipilih
         selected_type = self.jis_type_combo.currentText()
         current_preset = self.preset_combo.currentText()
         
-        # VALIDASI: Check apakah label valid sebelum start
+        #Check apakah label valid sebelum start
         if not self._is_valid_label(selected_type, current_preset):
             QMessageBox.warning(self, "Warning",
                 "Tolong pilih label dengan benar!")
             return
             
-        self._setup_logic_thread()  # Setup fresh logic thread
+        self._setup_logic_thread()  #Setup fresh logic thread
         
-        # Update button state dan style
+        #Update button state dan style
         self.is_camera_running = True
         self.btn_camera_toggle.setText("STOP")
-        self.btn_camera_toggle.setStyleSheet(self.BUTTON_STYLES['danger'])  # Bootstrap danger (red) untuk aktif
+        self.btn_camera_toggle.setStyleSheet(self.BUTTON_STYLES['danger'])
         
-        self._lock_label_and_type_controls()  # Lock preset dan label controls
+        self._lock_label_and_type_controls()  #Lock preset dan label controls
         
-        # Disable tombol SETTING saat kamera aktif dan ubah warna
+        #Disable tombol SETTING saat kamera aktif dan ubah warna
         self.btn_setting.setEnabled(False)
         self.btn_setting.setStyleSheet("""
             QPushButton {
@@ -1039,36 +966,34 @@ class MainWindow(QMainWindow):
             }
         """)
 
-        # Set camera options dan start detection
+        #Set camera options dan start detection
         if self.logic:
             self.logic.set_camera_options(
                 self.preset_combo.currentText(),
-                False,  # flip_h disabled
-                False,  # flip_v disabled
+                False,  #flip_h disabled
+                False,  #flip_v disabled
                 self.cb_edge.isChecked(),
                 self.cb_split.isChecked(),
                 2.0
             )
-            self.logic.set_target_label(selected_type)  # Set target label yang sudah divalidasi
+            self.logic.set_target_label(selected_type)  #Set target label yang sudah divalidasi
 
-            self.logic.start_detection()  # Start detection thread
-            self.logic_thread.start()  # Start Qt thread
+            self.logic.start_detection()  #Start detection thread
+            self.logic_thread.start()  #Start Qt thread
 
-        self._hide_success_popup()  # Hide success popup jika ada
+        self._hide_success_popup()  #Hide success popup jika ada
 
     def stop_detection(self):
         #Handler untuk menghentikan detection (dipanggil dari toggle_camera)
-        #Tujuan: Stop camera detection dan OCR scanning
-        #Fungsi: Stop detection thread, update UI, unlock controls
         
-        # Update button state dan style
+        #Update button state dan style
         self.is_camera_running = False
         self.btn_camera_toggle.setText("START")
         self.btn_camera_toggle.setStyleSheet(self.BUTTON_STYLES['success'])  # Bootstrap success (green) untuk inactive
         
         self._unlock_label_and_type_controls()
         
-        # Enable kembali tombol SETTING saat kamera stop dan kembalikan warna
+        #Enable kembali tombol SETTING saat kamera stop dan kembalikan warna
         self.btn_setting.setEnabled(True)
         self.btn_setting.setStyleSheet("""
             QPushButton {
@@ -1099,7 +1024,7 @@ class MainWindow(QMainWindow):
 
     def update_camera_status(self, status_text, is_running):
         #Update status kamera dan enable/disable camera combo.
-        # Disable camera combo saat kamera running untuk prevent switching
+
         self.camera_combo.setEnabled(not is_running)
         
         if not is_running:
@@ -1147,7 +1072,7 @@ class MainWindow(QMainWindow):
         if show_nothing:
             self.selected_type_label.setText("Pilih Label Terlebih Dahulu")
             self.selected_type_label.setStyleSheet("color: #FF6600; font-weight: normal; border: none;")
-            # NEW: Reset statistics
+            #Reset statistics
             self.update_statistics_display(". . .", 0, 0, 0)
             return
         
@@ -1180,7 +1105,7 @@ class MainWindow(QMainWindow):
                     item.setBackground(col, QColor(255, 0, 0))
                     item.setForeground(col, QColor(255, 255, 255))
         
-        # MODIFIED: Update statistics boxes
+        #Update statistics boxes
         self.update_statistics_display(selected_session, displayed_count, ok_count, not_ok_count)
 
     def view_selected_image(self, item, column):
@@ -1260,22 +1185,22 @@ class MainWindow(QMainWindow):
         )
         
         if reply == QMessageBox.Yes and self.logic:
-            # FIXED: Kumpulkan semua ID yang akan dihapus
+            #Kumpulkan semua ID yang akan dihapus
             record_ids = []
             for item in selected_items:
                 try:
-                    record_id = int(item.text(4))  # Kolom ke-4 adalah ID
+                    record_id = int(item.text(4))  #Kolom ke-4 adalah ID
                     record_ids.append(record_id)
                 except (ValueError, IndexError):
                     print(f"Warning: Invalid ID untuk item: {item.text(1)}")
                     continue
             
-            # FIXED: Panggil delete_codes dengan list IDs, bukan satu-satu
+            #Panggil delete_codes dengan list IDs, bukan satu-satu
             if record_ids:
                 success = self.logic.delete_codes(record_ids)
                 if success:
                     QMessageBox.information(self, "Sukses", f"{len(record_ids)} data berhasil dihapus!")
-                    self.update_code_display()  # Refresh tampilan
+                    self.update_code_display()  #Refresh tampilan
                 else:
                     QMessageBox.critical(self, "Error", "Gagal menghapus data dari database!")
             else:
@@ -1283,45 +1208,41 @@ class MainWindow(QMainWindow):
 
     def open_file_scan_dialog(self):
         #Membuka dialog file untuk scan
-        #Tujuan: Allow user scan image dari file
-        #Fungsi: Validasi label, open file dialog, start scan thread
         import threading
     
-        # Ambil label yang dipilih dan preset aktif
+        #Ambil label yang dipilih dan preset aktif
         selected_type = self.jis_type_combo.currentText()
         current_preset = self.preset_combo.currentText()
 
-        # VALIDASI BARU: Check apakah label valid sebelum scan file
+        #Check apakah label valid sebelum scan file
         if not self._is_valid_label(selected_type, current_preset):
             QMessageBox.warning(self, "Warning",
                 "Tolong pilih label dengan benar!")
             return
 
-        # Check apakah live detection sedang berjalan
+        #Check apakah live detection sedang berjalan
         if self.logic and self.logic.running:
              QMessageBox.information(self, "Info", "Harap hentikan Live Detection sebelum memindai dari file.")
              return
 
-        self._hide_success_popup()  # Hide popup jika ada
+        self._hide_success_popup()  #Hide popup jika ada
 
-        # Open file dialog untuk pilih image
+        #Open file dialog untuk pilih image
         file_path, _ = QFileDialog.getOpenFileName(
             self, "Select Image", "", "Image Files (*.png *.jpg *.jpeg *.bmp *.tiff)"
         )
 
         if file_path:
-            # User memilih file - start scan
+            #User memilih file - start scan
             self.btn_file.setText("SCANNING . . .")  # Update button text
             self.btn_file.setEnabled(False)  # Disable button saat scanning
-            # Start scan di background thread agar tidak block UI
+            #Start scan di background thread agar tidak block UI
             threading.Thread(target=self._scan_file_thread, args=(file_path,), daemon=True).start()
 
     def _scan_file_thread(self, file_path):
         #Thread untuk scan image file tanpa block UI.
         if self.logic:
-            # CRITICAL FIX: Set preset dan target_label SEBELUM scan_file dipanggil.
-            # Tanpa ini self.preset di logic tetap default JIS saat scan file DIN,
-            # karena set_camera_options hanya dipanggil saat live camera (start_detection).
+            #Set preset dan target_label SEBELUM scan_file dipanggil.
             selected_type = self.jis_type_combo.currentText()
             current_preset = self.preset_combo.currentText()
             self.logic.set_camera_options(
@@ -1345,12 +1266,11 @@ class MainWindow(QMainWindow):
         if not dialog:
             return
         
-        # Store state for access from export functions
+        #simpan status untuk diakses dari fungsi ekspor
         export_range_var = "All"
 
         def handle_export_click():
-            # Fungsi: Handle click export button dan validate filters
-            # Tujuan: Collect filter parameters dan start export thread
+            #Kumpulkan parameter filter dan mulai ekspor
             import threading
             from datetime import timedelta, time as py_time
 
@@ -1361,7 +1281,7 @@ class MainWindow(QMainWindow):
 
             try:
                 current_time = datetime.now()
-                range_key = dialog._export_range_value  # FIXED: Gunakan _export_range_value attribute
+                range_key = dialog._export_range_value  #Gunakan _export_range_value attribute
                 
                 if range_key == "All":
                     sql_filter = ""
@@ -1417,7 +1337,7 @@ class MainWindow(QMainWindow):
                 else:
                     sql_filter = f"WHERE preset = '{selected_export_preset}'"
 
-                # Filter label
+                #Filter label
                 if dialog.export_label_filter_enabled.isChecked():
                     selected_export_label = dialog.export_label_type_combo.currentText()
                     if selected_export_label and selected_export_label != "All Label":
@@ -1425,20 +1345,19 @@ class MainWindow(QMainWindow):
                             sql_filter += f" AND target_session = '{selected_export_label}'"
                         else:
                             sql_filter = f"WHERE target_session = '{selected_export_label}'"
-                        # Karena Label sudah ada di A3-B3, A1-B1 hanya untuk Date saja
 
                 dialog.accept()
 
-                # Buat progress dialog
+                #Buat progress dialog
                 self.progress_dialog = QProgressDialog("Memulai export...", "Batal", 0, 100, self)
                 self.progress_dialog.setWindowTitle("Export Data")
                 self.progress_dialog.setWindowModality(Qt.WindowModal)
-                self.progress_dialog.setMinimumDuration(0)  # Tampilkan langsung
+                self.progress_dialog.setMinimumDuration(0)  #Tampilkan langsung
                 self.progress_dialog.setValue(0)
-                self.progress_dialog.setAutoClose(False)  # Jangan auto close
+                self.progress_dialog.setAutoClose(False)  #Jangan auto close
                 self.progress_dialog.setAutoReset(False)
                 
-                # Connect signal untuk update progress - GUNAKAN SIGNAL BARU
+                #Connect signal untuk update progress
                 def update_progress_dialog(message, value):
                     if self.progress_dialog:
                         try:
@@ -1451,7 +1370,7 @@ class MainWindow(QMainWindow):
                 
                 self.progress_dialog.show()
 
-                # Start export in background thread
+                #mulai ekspor
                 threading.Thread(
                     target=self._execute_export_thread, 
                     args=(
@@ -1483,17 +1402,14 @@ class MainWindow(QMainWindow):
     def _execute_export_thread(self, sql_filter, date_range_desc, export_label="", current_preset=""):
         #Thread untuk proses export data ke Excel.
         from export import execute_export
-    
-        # Tidak perlu emit status signal karena bisa menyebabkan error
-        # User akan melihat hasil di message box
         
         if not self.logic:
              self.export_result_signal.emit("EXPORT_ERROR: Logic Object not found")
              return
         
-        # Callback function untuk update progress - GUNAKAN SIGNAL PROGRESS YANG BARU
+        #Callback function untuk update progress
         def progress_callback(current, total, message):
-            # Emit signal untuk update progress dialog
+            #Emit signal untuk update progress dialog
             self.export_progress_signal.emit(message, f"{current}")
         
         result = execute_export(sql_filter, date_range_desc, export_label, current_preset, progress_callback)
@@ -1501,20 +1417,20 @@ class MainWindow(QMainWindow):
         self.export_result_signal.emit(result)
 
     def _handle_export_result(self, result):
-        #"""Handle hasil export dan tampilkan feedback kepada user.
+        #Handle hasil export dan tampilkan feedback kepada user.
         self.btn_export.setText("EXPORT DATA")
         self.btn_export.setStyleSheet(self.BUTTON_STYLES['primary'])
         
-        # Tutup progress dialog jika masih terbuka
+        #Tutup progress dialog jika masih terbuka
         if hasattr(self, 'progress_dialog') and self.progress_dialog:
             self.progress_dialog.close()
             self.progress_dialog = None
         
-        # Disconnect signal progress untuk cleanup
+        #Disconnect signal progress untuk cleanup
         try:
             self.export_progress_signal.disconnect()
         except:
-            pass  # Ignore jika tidak ada connection
+            pass  #ignore jika tidak ada connection
         
         if result == "NO_DATA":
             QMessageBox.information(self, "Info", "Tidak ada data !")
@@ -1523,43 +1439,43 @@ class MainWindow(QMainWindow):
             QMessageBox.critical(self, "Error Export", f"Gagal mengekspor data ke Excel:\n{result[13:]}")
             self._update_export_button_ui("Export Gagal!", "danger")
         else:
-            # Export berhasil - tampilkan custom dialog dengan button open folder
+            #Export berhasil - tampilkan custom dialog dengan button open folder
             self._show_export_success_dialog(result)
             self._update_export_button_ui("EXPORT SUCCESS!", "success")
     
     def _show_export_success_dialog(self, filepath):
-        """Tampilkan dialog sukses export dengan button untuk membuka folder."""
+        #Tampilkan dialog sukses export dengan button untuk membuka folder.
         msg_box = QMessageBox(self)
         msg_box.setWindowTitle("Export Success")
         msg_box.setIcon(QMessageBox.Information)
         msg_box.setText(f"Data berhasil diekspor ke:\n{filepath}")
         
-        # Tambah button untuk open folder
+        #Tambah button untuk open folder
         open_folder_btn = msg_box.addButton("Open Folder", QMessageBox.ActionRole)
         ok_btn = msg_box.addButton(QMessageBox.Ok)
         
         msg_box.exec()
         
-        # Cek button mana yang diklik
+        #Cek button mana yang diklik
         if msg_box.clickedButton() == open_folder_btn:
             self._open_file_location(filepath)
     
     def _open_file_location(self, filepath):
-        """Buka folder tempat file berada di file explorer."""
+        #Buka folder tempat file berada di file explorer.
         try:
             folder_path = os.path.dirname(os.path.abspath(filepath))
             
-            # Deteksi OS dan gunakan command yang sesuai
+            #Deteksi OS dan gunakan command yang sesuai
             system = platform.system()
             
             if system == "Windows":
-                # Windows: gunakan explorer dengan /select untuk highlight file
+                #Windows: gunakan explorer dengan /select untuk highlight file
                 subprocess.run(['explorer', '/select,', os.path.abspath(filepath)])
             elif system == "Darwin":  # macOS
-                # macOS: gunakan open dengan -R untuk reveal in Finder
+                #macOS: gunakan open dengan -R untuk reveal in Finder
                 subprocess.run(['open', '-R', filepath])
-            else:  # Linux dan OS lainnya
-                # Linux: buka folder (tidak bisa highlight file spesifik di semua file manager)
+            else:  #Linux dan OS lainnya
+                #Linux: buka folder (tidak bisa highlight file spesifik di semua file manager)
                 subprocess.run(['xdg-open', folder_path])
                 
         except Exception as e:
@@ -1577,29 +1493,27 @@ class MainWindow(QMainWindow):
         self.btn_export.setStyleSheet(self.BUTTON_STYLES['primary'])
 
     def _populate_camera_list(self):
-        """
-        Fungsi untuk mengisi dropdown camera dengan kamera yang tersedia
-        Tujuan: Deteksi dan tampilkan semua kamera yang terhubung ke sistem
-        """
+        #untuk mengisi dropdown camera dengan kamera yang tersedia
+
         from utils import get_available_cameras
         from config import MAX_CAMERAS
         
-        # Clear existing items
+        #Clear existing items
         self.camera_combo.clear()
         
-        # Get list of available cameras
+        #Get list of available cameras
         self.available_cameras = get_available_cameras(MAX_CAMERAS)
         
         if len(self.available_cameras) == 0:
-            # Tidak ada kamera terdeteksi
+            #Tidak ada kamera terdeteksi
             self.camera_combo.addItem("No Camera Detected")
             self.camera_combo.setEnabled(False)
         else:
-            # Ada kamera terdeteksi - tambahkan ke dropdown
+            #Ada kamera terdeteksi - tambahkan ke dropdown
             for cam in self.available_cameras:
                 self.camera_combo.addItem(cam['name'], cam['index'])
             
-            # Set ke kamera eksternal jika ada, jika tidak ke internal
+            #Set ke kamera eksternal jika ada, jika tidak ke internal
             external_index = -1
             for i, cam in enumerate(self.available_cameras):
                 if cam['index'] > 0:
@@ -1614,15 +1528,12 @@ class MainWindow(QMainWindow):
             self.camera_combo.setEnabled(True)
     
     def _on_camera_selection_changed(self, index):
-        """
-        Fungsi handler saat user memilih kamera berbeda dari dropdown
-        Tujuan: Update selected camera di detection logic
-        Parameter: index - index item yang dipilih di combobox
-        """
+        #handler saat user memilih kamera berbeda dari dropdown
+
         if index < 0 or not self.available_cameras:
             return
         
-        # Cegah perubahan kamera saat deteksi sedang berjalan
+        #Cegah perubahan kamera saat deteksi sedang berjalan
         if self.logic and self.logic.running:
             QMessageBox.warning(
                 self,
@@ -1636,12 +1547,12 @@ class MainWindow(QMainWindow):
             self.camera_combo.blockSignals(False)
             return
         
-        # Update selected camera index di logic
+        #Update selected camera index di logic
         camera_index = self.camera_combo.currentData()
         if self.logic and camera_index is not None:
             self.logic.current_camera_index = camera_index
         
-        # Simpan index saat ini untuk reference
+        #Simpan index saat ini untuk reference
         self._prev_camera_index = index
 
     def _update_label_options(self, preset):
@@ -1652,10 +1563,10 @@ class MainWindow(QMainWindow):
         
         if preset == "DIN":
             self.jis_type_combo.addItems(DIN_TYPES)
-        else:  # JIS
+        else:  #JIS
             self.jis_type_combo.addItems(JIS_TYPES)
         
-        # Restore previous selection jika masih valid
+        #Restore previous selection jika masih valid
         index = self.jis_type_combo.findText(current_selection)
         if index >= 0:
             self.jis_type_combo.setCurrentIndex(index)
