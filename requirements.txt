@@ -1,20 +1,18 @@
-#GUI Framework
-PySide6>=6.5.0
+#web framework
+flask>=3.1.2
+flask-socketio>=5.3.6
 
-#Camera & Image Processing
-opencv-python>=4.8.0
-Pillow>=10.0.0
-numpy>=1.24.0
-
-#OCR
+#computer vision & OCR
+opencv-python>=4.13.0
 easyocr>=1.7.0
 
-#Deep Learning Backend (CPU version - default)
-#Ganti dengan versi CUDA jika menggunakan GPU NVIDIA
-torch>=2.0.0
-torchvision>=0.15.0
+#image processing
+pillow>=12.1.1
 
-#Data & Export Excel
-pandas>=2.0.0
-openpyxl>=3.1.0
-xlsxwriter>=3.1.0
+#data & export
+numpy>=2.4.2
+pandas>=3.0.1
+openpyxl>=3.1.5
+xlsxwriter>=3.2.9
+
+PySide6>=6.7.0

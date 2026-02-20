@@ -3,10 +3,10 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>QC Battery Inspector</title>
+<title>Inspeksi Karton</title>
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&family=Montserrat:wght@500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.2/css/bootstrap.min.css">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-icons/1.11.3/font/bootstrap-icons.min.css">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.min.js"></script>
@@ -42,6 +42,56 @@
   --shadow-md: 0 4px 16px rgba(0,0,0,.08);
 }
 
+/* ── DARK MODE ──────────────────────────────────── */
+html.dark {
+  --bg:        #0f1117;
+  --surface:   #1a1d27;
+  --surface-2: #22263a;
+
+  --border:    #2e3347;
+  --border-2:  #3a4060;
+
+  --text-1:    #e8eaf0;
+  --text-2:    #9aa0b8;
+  --text-3:    #5a6080;
+
+  --accent:    #3b82f6;
+  --accent-bg: #1e2a4a;
+
+  --green:     #22c55e;
+  --green-bg:  #0d2a1a;
+  --red:       #ef4444;
+  --red-bg:    #2a0d0d;
+  --amber:     #f59e0b;
+
+  --shadow:    0 1px 3px rgba(0,0,0,.3);
+  --shadow-md: 0 4px 16px rgba(0,0,0,.4);
+}
+html.dark #video-ph p { color: #444; }
+html.dark .ph-ring { border-color: #2a2a2a; color: #444; }
+html.dark #center { background: #0a0a0f; }
+html.dark .modal-content { background: var(--surface); }
+html.dark .modal-header, html.dark .modal-body, html.dark .modal-footer { background: var(--surface); }
+html.dark .modal-footer { background: var(--surface-2); }
+html.dark .m-group { background: var(--surface); }
+html.dark .m-title { background: var(--surface); }
+html.dark .btn-close { filter: invert(1); }
+html.dark select, html.dark input[type=date] { background: var(--surface-2); color: var(--text-1); border-color: var(--border); }
+html.dark .ss-input-box { background: var(--surface-2); border-color: var(--border); }
+html.dark .ss-input-box input { background: transparent; color: var(--text-1); }
+html.dark .ss-dropdown { background: var(--surface); border-color: var(--border); }
+html.dark .ss-option:hover { background: var(--surface-2); }
+
+/* ── Dark Mode Toggle Button ────────────────────── */
+#theme-btn {
+  width: 36px; height: 36px; border-radius: 50%;
+  border: 1px solid var(--border); background: var(--surface-2);
+  color: var(--text-2); font-size: 16px; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  transition: all .2s; flex-shrink: 0;
+}
+#theme-btn:hover { border-color: var(--accent); color: var(--accent); background: var(--accent-bg); }
+
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 html, body { height: 100%; overflow: hidden; font-family: var(--font); font-size: 14px; color: var(--text-1); background: var(--bg); }
 
@@ -64,7 +114,13 @@ html, body { height: 100%; overflow: hidden; font-family: var(--font); font-size
 .brand-sub { font-size: 13px; font-weight: 400; color: var(--text-3); }
 
 .top-right { display: flex; align-items: center; gap: 14px; }
-#clock { font-family: var(--mono); font-size: 13px; color: var(--text-2); }
+#nav-datetime {
+  display: flex; align-items: center; gap: 8px;
+  font-family: var(--mono); color: var(--text-1);
+}
+#nav-date { font-family: var(--mono); font-size: 14px; font-weight: 500; color: var(--text-1); letter-spacing: .5px; }
+#nav-sep  { color: var(--border-2); font-size: 14px; }
+#nav-time { font-family: var(--mono); font-size: 14px; font-weight: 500; color: var(--text-1); letter-spacing: .5px; }
 #cam-badge {
   display: flex; align-items: center; gap: 6px;
   padding: 5px 12px; border-radius: 99px;
@@ -85,25 +141,26 @@ html, body { height: 100%; overflow: hidden; font-family: var(--font); font-size
   background: var(--surface);
   border-right: 1px solid var(--border);
   display: flex; flex-direction: column;
-  padding: 18px 16px; gap: 14px;
+  padding: 18px 16px; gap: 10px;
   overflow-y: auto; flex-shrink: 0;
 }
-#left-panel  { width: 310px; }
-#right-panel { width: 360px; border-right: none; border-left: 1px solid var(--border); }
+#left-panel  { width: 360px; }
+#right-panel { width: 430px; border-right: none; border-left: 1px solid var(--border); }
 
 /* ── SECTION LABEL ──────────────────────────────── */
 .label {
-  font-size: 11px; font-weight: 600; letter-spacing: 1.2px;
-  text-transform: uppercase; color: var(--text-3);
+  font-size: 13px; font-weight: 700; letter-spacing: 1.4px;
+  text-transform: uppercase; color: #3b4a6b;
   margin-bottom: 6px;
 }
+html.dark .label { color: #93c5fd; }
 
 /* ── SELECT / INPUT ─────────────────────────────── */
 select, input[type=date] {
-  width: 100%; padding: 9px 12px;
+  width: 100%; padding: 11px 14px;
   background: var(--surface); border: 1px solid var(--border);
   border-radius: var(--r-sm); color: var(--text-1);
-  font-family: var(--font); font-size: 13px;
+  font-family: var(--font); font-size: 14px;
   outline: none; appearance: none; -webkit-appearance: none;
   cursor: pointer; transition: border-color .15s;
 }
@@ -112,21 +169,21 @@ select:focus, input[type=date]:focus { border-color: var(--accent); box-shadow: 
 .sel-wrap::after { content: '\f282'; font-family: 'bootstrap-icons'; position: absolute; right: 11px; top: 50%; transform: translateY(-50%); color: var(--text-3); pointer-events: none; font-size: 12px; }
 
 /* ── TOGGLE SWITCH ──────────────────────────────── */
-.opt-row { display: flex; align-items: center; justify-content: space-between; padding: 7px 0; border-bottom: 1px solid var(--border); }
+.opt-row { display: flex; align-items: center; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid var(--border); }
 .opt-row:last-child { border-bottom: none; }
-.opt-name { font-size: 13px; color: var(--text-2); font-weight: 400; }
-.tog { position: relative; width: 36px; height: 20px; cursor: pointer; flex-shrink: 0; }
+.opt-name { font-size: 14px; color: var(--text-2); font-weight: 400; }
+.tog { position: relative; width: 44px; height: 24px; cursor: pointer; flex-shrink: 0; }
 .tog input { display: none; }
 .tog-track { position: absolute; inset: 0; border-radius: 99px; background: var(--surface-2); border: 1px solid var(--border-2); transition: all .2s; }
 .tog input:checked + .tog-track { background: var(--accent); border-color: var(--accent); }
-.tog-thumb { position: absolute; top: 3px; left: 3px; width: 12px; height: 12px; border-radius: 50%; background: var(--border-2); transition: all .2s; pointer-events: none; }
-.tog input:checked ~ .tog-thumb { transform: translateX(16px); background: #fff; }
+.tog-thumb { position: absolute; top: 4px; left: 4px; width: 14px; height: 14px; border-radius: 50%; background: var(--border-2); transition: all .2s; pointer-events: none; }
+.tog input:checked ~ .tog-thumb { transform: translateX(20px); background: #fff; }
 
 /* ── BUTTONS ────────────────────────────────────── */
 .btn {
-  display: flex; align-items: center; justify-content: center; gap: 7px;
-  width: 100%; padding: 10px 16px; border: none; border-radius: var(--r);
-  font-family: var(--font); font-size: 13px; font-weight: 600;
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  width: 100%; padding: 13px 18px; border: none; border-radius: var(--r);
+  font-family: var(--font); font-size: 14px; font-weight: 600;
   cursor: pointer; transition: all .15s; outline: none; letter-spacing: .2px;
 }
 .btn-primary { background: var(--accent); color: #fff; }
@@ -146,10 +203,10 @@ select:focus, input[type=date]:focus { border-color: var(--accent); box-shadow: 
 .btn-stop-state:hover { background: #b91c1c; }
 
 .btn-icon {
-  width: 40px; flex-shrink: 0; padding: 10px 0;
+  width: 46px; flex-shrink: 0; padding: 13px 0;
   background: var(--surface-2); border: 1px solid var(--border);
   color: var(--text-2); border-radius: var(--r);
-  font-size: 17px; cursor: pointer; transition: all .15s;
+  font-size: 19px; cursor: pointer; transition: all .15s;
   display: flex; align-items: center; justify-content: center;
 }
 .btn-icon:hover { border-color: var(--border-2); color: var(--text-1); }
@@ -167,7 +224,7 @@ select:focus, input[type=date]:focus { border-color: var(--accent); box-shadow: 
 
 /* ── OCR OUTPUT ─────────────────────────────────── */
 #ocr-box {
-  flex: 1; min-height: 80px;
+  min-height: 40px; max-height: 120px;
   border: 1px solid var(--border); border-radius: var(--r);
   background: var(--surface-2); padding: 10px;
   overflow-y: auto;
@@ -177,21 +234,21 @@ select:focus, input[type=date]:focus { border-color: var(--accent); box-shadow: 
 /* ── STATISTIK ──────────────────────────────────── */
 .stat-label-pill {
   display: flex; align-items: center; justify-content: space-between;
-  padding: 10px 12px; border-radius: var(--r);
+  padding: 22px 22px; border-radius: var(--r);
   background: var(--accent-bg); border: 1px solid #bfdbfe;
 }
-.stat-label-key { font-size: 11px; font-weight: 600; letter-spacing: 1px; text-transform: uppercase; color: var(--accent); }
-.stat-label-val { font-family: var(--mono); font-size: 13px; font-weight: 500; color: var(--accent); }
+.stat-label-key { font-size: 14px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; color: var(--accent); }
+.stat-label-val { font-family: 'Montserrat', sans-serif; font-size: 23px; font-weight: 700; color: var(--accent); letter-spacing: .5px; }
 
-.stat-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 8px; }
+.stat-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 10px; }
 .stat-card {
   background: var(--surface-2); border: 1px solid var(--border);
-  border-radius: var(--r); padding: 12px 8px; text-align: center;
+  border-radius: var(--r); padding: 20px 8px; text-align: center;
 }
-.stat-num { font-family: var(--mono); font-size: 28px; font-weight: 500; line-height: 1; }
-.stat-key { font-size: 10px; font-weight: 600; letter-spacing: 1.2px; text-transform: uppercase; color: var(--text-3); margin-top: 5px; }
+.stat-num { font-family: var(--mono); font-size: 44px; font-weight: 600; line-height: 1; }
+.stat-key { font-size: 12px; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase; color: var(--text-3); margin-top: 9px; }
 .c-total { color: var(--text-1); }
-.c-ok    { color: var(--green); }
+.c-ok    { color: #1e40af; }
 .c-nok   { color: var(--red); }
 
 /* ── CENTER ─────────────────────────────────────── */
@@ -238,30 +295,35 @@ select:focus, input[type=date]:focus { border-color: var(--accent); box-shadow: 
   flex: 1; min-height: 0; overflow-y: auto;
   border: 1px solid var(--border); border-radius: var(--r);
 }
-#code-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+#code-table { width: 100%; border-collapse: collapse; font-size: 14px; }
 #code-table thead th {
   background: var(--surface-2); position: sticky; top: 0; z-index: 1;
-  padding: 9px 10px; text-align: left;
+  padding: 11px 12px; text-align: left;
   border-bottom: 1px solid var(--border);
-  font-size: 11px; font-weight: 600; letter-spacing: .8px;
+  font-size: 12px; font-weight: 600; letter-spacing: .8px;
   text-transform: uppercase; color: var(--text-3);
 }
 #code-table thead th:last-child { text-align: center; }
 #code-table tbody tr { border-bottom: 1px solid var(--border); cursor: pointer; transition: background .1s; }
 #code-table tbody tr:last-child { border-bottom: none; }
 #code-table tbody tr:hover { background: var(--surface-2); }
-#code-table tbody tr.selected { background: var(--accent-bg); }
+#code-table tbody tr.selected { background: #b91c1c !important; }
+#code-table tbody tr.selected td { color: #fff !important; }
+#code-table tbody tr.selected td:nth-child(2) { color: #fff !important; }
 #code-table tbody tr.not-ok { background: var(--red-bg); }
 #code-table tbody tr.not-ok:hover { background: #fee2e2; }
-#code-table tbody td { padding: 9px 10px; color: var(--text-2); vertical-align: middle; }
-#code-table tbody td:nth-child(2) { font-family: var(--mono); font-size: 12px; color: var(--text-1); }
+#code-table tbody tr.not-ok.selected { background: #b91c1c !important; }
+#code-table tbody td { padding: 11px 12px; color: var(--text-2); vertical-align: middle; }
+#code-table tbody td:nth-child(2) { font-family: var(--mono); font-size: 13px; color: var(--text-1); }
 #code-table tbody td:last-child { text-align: center; }
 .badge-ok  { display: inline-block; padding: 2px 10px; border-radius: 99px; font-size: 11px; font-weight: 600; background: var(--green-bg); color: var(--green); border: 1px solid #bbf7d0; }
 .badge-nok { display: inline-block; padding: 2px 10px; border-radius: 99px; font-size: 11px; font-weight: 600; background: var(--red-bg); color: var(--red); border: 1px solid #fecaca; }
 
-#right-dt { font-size: 12px; color: var(--text-3); font-family: var(--mono); }
 .data-head { display: flex; align-items: center; justify-content: space-between; }
-.data-count { font-size: 12px; color: var(--text-3); }
+.data-count { font-size: 15px; font-weight: 600; color: var(--text-2); font-family: var(--mono); }
+
+/* Override label size only for Data Barang heading */
+.data-head .label { font-size: 14px; letter-spacing: 1px; margin: 0; }
 
 /* ── MODAL ──────────────────────────────────────── */
 .modal-content { border: 1px solid var(--border); border-radius: 12px; box-shadow: var(--shadow-md); }
@@ -289,30 +351,103 @@ select:focus, input[type=date]:focus { border-color: var(--accent); box-shadow: 
 .progress-fill  { height: 100%; background: var(--accent); border-radius: 99px; transition: width .3s; width: 0%; }
 .progress-msg   { font-size: 11px; color: var(--text-3); text-align: center; margin-top: 6px; }
 
-/* ── TOAST ──────────────────────────────────────── */
+/* ── SEARCHABLE SELECT ──────────────────────────── */
+.ss-wrap { position: relative; width: 100%; }
+.ss-input-box {
+  display: flex; align-items: center;
+  width: 100%; padding: 11px 14px;
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--r-sm); color: var(--text-1);
+  font-family: var(--font); font-size: 14px; cursor: pointer;
+  transition: border-color .15s; gap: 8px; user-select: none;
+}
+.ss-input-box:focus-within,
+.ss-wrap.open .ss-input-box { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(37,99,235,.1); }
+.ss-input-box input {
+  flex: 1; border: none; outline: none; background: transparent;
+  font-family: var(--font); font-size: 14px; color: var(--text-1);
+  cursor: pointer; min-width: 0;
+}
+.ss-input-box input::placeholder { color: var(--text-3); }
+.ss-chevron { color: var(--text-3); font-size: 12px; flex-shrink: 0; transition: transform .2s; }
+.ss-wrap.open .ss-chevron { transform: rotate(180deg); }
+.ss-dropdown {
+  display: none; position: absolute; top: calc(100% + 4px); left: 0; right: 0;
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--r); box-shadow: 0 8px 24px rgba(0,0,0,.12);
+  z-index: 9000; max-height: 220px; overflow-y: auto;
+}
+.ss-wrap.open .ss-dropdown { display: block; }
+.ss-option {
+  padding: 10px 14px; font-size: 14px; color: var(--text-2);
+  cursor: pointer; transition: background .1s;
+}
+.ss-option:hover { background: var(--surface-2); color: var(--text-1); }
+.ss-option.selected { background: var(--accent-bg); color: var(--accent); font-weight: 600; }
+.ss-option.disabled { color: var(--text-3); cursor: default; font-style: italic; }
+.ss-option.disabled:hover { background: transparent; }
+.ss-empty { padding: 12px 14px; font-size: 13px; color: var(--text-3); text-align: center; }
+
+#confirm-overlay {
+  display: none; position: fixed; inset: 0; z-index: 10000;
+  background: rgba(0,0,0,.45); backdrop-filter: blur(4px);
+  align-items: center; justify-content: center;
+  animation: fadeIn .15s ease;
+}
+#confirm-overlay.show { display: flex; }
+#confirm-box {
+  background: var(--surface); border-radius: 14px;
+  border: 1px solid var(--border); box-shadow: 0 20px 60px rgba(0,0,0,.2);
+  padding: 28px 28px 22px; min-width: 320px; max-width: 400px;
+  animation: popIn .2s cubic-bezier(.34,1.56,.64,1);
+}
+@keyframes popIn { from{opacity:0;transform:scale(.9)} to{opacity:1;transform:scale(1)} }
+#confirm-icon {
+  width: 52px; height: 52px; border-radius: 50%;
+  background: var(--red-bg); border: 1px solid #fecaca;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 24px; color: var(--red); margin: 0 auto 16px;
+}
+#confirm-title { font-size: 16px; font-weight: 700; color: var(--text-1); text-align: center; margin-bottom: 8px; }
+#confirm-msg   { font-size: 13px; color: var(--text-2); text-align: center; line-height: 1.6; margin-bottom: 22px; }
+#confirm-btns  { display: flex; gap: 10px; }
+#confirm-cancel {
+  flex: 1; padding: 11px; border-radius: var(--r); border: 1px solid var(--border-2);
+  background: var(--surface); color: var(--text-2); font-family: var(--font);
+  font-size: 14px; font-weight: 600; cursor: pointer; transition: all .15s;
+}
+#confirm-cancel:hover { border-color: var(--border-2); background: var(--surface-2); }
+#confirm-ok {
+  flex: 1; padding: 11px; border-radius: var(--r); border: none;
+  background: var(--red); color: #fff; font-family: var(--font);
+  font-size: 14px; font-weight: 600; cursor: pointer; transition: all .15s;
+}
+#confirm-ok:hover { background: #b91c1c; }
+
 #toast-ct {
-  position: fixed; top: 62px; right: 18px; z-index: 9999;
-  display: flex; flex-direction: column; gap: 8px; pointer-events: none;
+  position: fixed; top: 68px; left: 50%; transform: translateX(-50%);
+  z-index: 9999; display: flex; flex-direction: column; gap: 10px;
+  pointer-events: none; width: 420px;
 }
 .toast-item {
   background: var(--surface); border: 1px solid var(--border);
-  border-radius: var(--r); padding: 12px 16px;
-  min-width: 280px; box-shadow: var(--shadow-md);
-  display: flex; align-items: flex-start; gap: 11px;
-  pointer-events: all; animation: slideIn .2s ease;
+  border-radius: var(--r); padding: 16px 20px;
+  box-shadow: 0 8px 32px rgba(0,0,0,.16);
+  display: flex; align-items: flex-start; gap: 14px;
+  pointer-events: all; animation: slideDown .25s cubic-bezier(.34,1.56,.64,1);
 }
-@keyframes slideIn { from{opacity:0;transform:translateX(12px)} to{opacity:1;transform:none} }
-.toast-item.success { border-left: 3px solid var(--green); }
-.toast-item.danger  { border-left: 3px solid var(--red); }
-.toast-item.warning { border-left: 3px solid var(--amber); }
-.toast-item.info    { border-left: 3px solid var(--accent); }
-.ti-icon { font-size: 16px; flex-shrink: 0; margin-top: 1px; }
+@keyframes slideDown { from{opacity:0;transform:translateY(-12px) scale(.97)} to{opacity:1;transform:translateY(0) scale(1)} }
+.toast-item.success { border-left: 4px solid var(--green); }
+.toast-item.danger  { border-left: 4px solid var(--red); }
+.toast-item.warning { border-left: 4px solid var(--amber); }
+.toast-item.info    { border-left: 4px solid var(--accent); }
+.ti-icon { font-size: 22px; flex-shrink: 0; margin-top: 1px; }
 .ti-icon.success { color: var(--green); } .ti-icon.danger { color: var(--red); }
 .ti-icon.warning { color: var(--amber); } .ti-icon.info   { color: var(--accent); }
 .ti-body { flex: 1; }
-.ti-title { font-weight: 600; font-size: 13px; color: var(--text-1); }
-.ti-msg   { font-size: 12px; color: var(--text-2); margin-top: 1px; }
-.ti-x { background: none; border: none; color: var(--text-3); font-size: 16px; cursor: pointer; padding: 0; line-height: 1; flex-shrink: 0; }
+.ti-title { font-weight: 700; font-size: 15px; color: var(--text-1); }
+.ti-msg   { font-size: 13px; color: var(--text-2); margin-top: 3px; }
+.ti-x { background: none; border: none; color: var(--text-3); font-size: 18px; cursor: pointer; padding: 0; line-height: 1; flex-shrink: 0; }
 .ti-x:hover { color: var(--text-1); }
 </style>
 </head>
@@ -322,12 +457,19 @@ select:focus, input[type=date]:focus { border-color: var(--accent); box-shadow: 
 <header id="topbar">
   <div class="brand">
     <div class="brand-dot"></div>
-    <span class="brand-name">QC Battery</span>
+    <span class="brand-name">Inspeksi Karton</span>
     <span class="brand-sep">·</span>
-    <span class="brand-sub">Inspector</span>
+    <span class="brand-sub">Inspection Battery Cardboard</span>
   </div>
   <div class="top-right">
-    <span id="clock">--:--:--</span>
+    <div id="nav-datetime">
+      <span id="nav-date">Memuat…</span>
+      <span style="color:var(--border-2)">·</span>
+      <span id="nav-time">--:--:--</span>
+    </div>
+    <button id="theme-btn" onclick="toggleTheme()" title="Toggle Dark/Light Mode">
+      <i class="bi bi-moon-fill" id="theme-icon"></i>
+    </button>
     <div id="cam-badge"><div class="dot"></div><span id="cam-txt">Camera Off</span></div>
   </div>
 </header>
@@ -376,7 +518,9 @@ select:focus, input[type=date]:focus { border-color: var(--accent); box-shadow: 
   <!-- Success popup -->
   <div id="success-area"><div id="success-popup"></div></div>
 
-  <div style="flex:1;display:flex;flex-direction:column;min-height:0;">
+  <div style="flex:1;min-height:12px;max-height:32px"></div>
+
+  <div>
     <div class="label">OCR Output</div>
     <div id="ocr-box">
       <div class="ocr-item" style="color:var(--text-3)">Menunggu deteksi…</div>
@@ -427,8 +571,6 @@ select:focus, input[type=date]:focus { border-color: var(--accent); box-shadow: 
     </button>
   </div>
 
-  <div id="right-dt"></div>
-
   <div class="data-head">
     <div class="label" style="margin:0">Data Barang</div>
     <div class="data-count" id="data-count">0 record</div>
@@ -456,25 +598,32 @@ select:focus, input[type=date]:focus { border-color: var(--accent); box-shadow: 
 
 <!-- MODAL: SETTING -->
 <div class="modal fade" id="mSetting" tabindex="-1">
-  <div class="modal-dialog modal-dialog-centered" style="max-width:300px">
+  <div class="modal-dialog modal-dialog-centered" style="max-width:420px">
     <div class="modal-content">
       <div class="modal-header">
         <span class="modal-title">Setting</span>
         <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
       </div>
-      <div class="modal-body" style="display:flex;flex-direction:column;gap:14px">
+      <div class="modal-body" style="display:flex;flex-direction:column;gap:18px">
         <div class="m-group">
           <span class="m-title">Select Camera</span>
           <div class="sel-wrap"><select id="s-cam"></select></div>
         </div>
-        <div style="display:flex;gap:10px">
+        <div style="display:flex;gap:12px">
           <div class="m-group" style="flex:1">
             <span class="m-title">Tipe</span>
             <div class="sel-wrap"><select id="s-preset" onchange="syncSettingLabel()"><option value="JIS">JIS</option><option value="DIN">DIN</option></select></div>
           </div>
-          <div class="m-group" style="flex:1;min-width:0">
+          <div class="m-group" style="flex:2;min-width:0">
             <span class="m-title">Label</span>
-            <div class="sel-wrap"><select id="s-label" style="font-size:12px"></select></div>
+            <div class="ss-wrap" id="ss-label-wrap">
+              <div class="ss-input-box" onclick="ssToggle('ss-label-wrap')">
+                <input type="text" id="ss-label-input" placeholder="Cari label…" oninput="ssFilter('ss-label-wrap','s-label')" autocomplete="off">
+                <i class="bi bi-chevron-down ss-chevron"></i>
+              </div>
+              <div class="ss-dropdown" id="ss-label-drop"></div>
+            </div>
+            <input type="hidden" id="s-label">
             <div class="warn-note">* Pilih label terlebih dahulu</div>
           </div>
         </div>
@@ -487,7 +636,7 @@ select:focus, input[type=date]:focus { border-color: var(--accent); box-shadow: 
 
 <!-- MODAL: EXPORT -->
 <div class="modal fade" id="mExport" tabindex="-1">
-  <div class="modal-dialog modal-dialog-centered" style="max-width:340px">
+  <div class="modal-dialog modal-dialog-centered" style="max-width:460px">
     <div class="modal-content">
       <div class="modal-header">
         <span class="modal-title">Export Data</span>
@@ -508,7 +657,14 @@ select:focus, input[type=date]:focus { border-color: var(--accent); box-shadow: 
               <div class="sel-wrap" style="flex:1"><select id="x-preset" style="font-size:12px;padding:6px 24px 6px 8px" onchange="populateXLabel()"><option value="Preset">Preset</option><option value="JIS">JIS</option><option value="DIN">DIN</option></select></div>
             </div>
             <div class="form-check mt-2"><input class="form-check-input" type="checkbox" id="x-lchk" checked onchange="onXLabelChk()"><label class="form-check-label" for="x-lchk">Pilih Label</label></div>
-            <div class="sel-wrap"><select id="x-label" style="font-size:12px;padding:6px 24px 6px 8px"></select></div>
+            <div class="ss-wrap" id="ss-xlabel-wrap">
+              <div class="ss-input-box" onclick="ssToggle('ss-xlabel-wrap')">
+                <input type="text" id="ss-xlabel-input" placeholder="Cari label…" oninput="ssFilter('ss-xlabel-wrap','x-label')" autocomplete="off">
+                <i class="bi bi-chevron-down ss-chevron"></i>
+              </div>
+              <div class="ss-dropdown" id="ss-xlabel-drop"></div>
+            </div>
+            <input type="hidden" id="x-label" value="All Label">
           </div>
         </div>
 
@@ -542,6 +698,19 @@ select:focus, input[type=date]:focus { border-color: var(--accent); box-shadow: 
           <i class="bi bi-download"></i> Export
         </button>
       </div>
+    </div>
+  </div>
+</div>
+
+<!-- CUSTOM CONFIRM DIALOG -->
+<div id="confirm-overlay">
+  <div id="confirm-box">
+    <div id="confirm-icon"><i class="bi bi-trash3-fill"></i></div>
+    <div id="confirm-title">Hapus Data</div>
+    <div id="confirm-msg"></div>
+    <div id="confirm-btns">
+      <button id="confirm-cancel" onclick="closeConfirm(false)">Batal</button>
+      <button id="confirm-ok" onclick="closeConfirm(true)">Ya, Hapus</button>
     </div>
   </div>
 </div>
@@ -595,6 +764,15 @@ io_socket.on('export_done', d => {
 /* ── Init ──────────────────────────────────── */
 async function init(){
   startClock();
+  // Default: Light Mode. Dark hanya aktif jika user sebelumnya memilih dark.
+  document.documentElement.classList.remove('dark');
+  if(localStorage.getItem('theme')==='dark'){
+    document.documentElement.classList.add('dark');
+    el('theme-icon').className='bi bi-sun-fill';
+  } else {
+    localStorage.setItem('theme','light');
+    el('theme-icon').className='bi bi-moon-fill';
+  }
   const ld=await (await fetch('/api/labels')).json();
   S.jis=ld.jis||[]; S.din=ld.din||[]; S.months=ld.months||[];
   populateXMonth(); populateXLabel();
@@ -602,19 +780,49 @@ async function init(){
   const sd=await (await fetch('/api/state')).json();
   S.preset=sd.preset||'JIS'; S.label=sd.target_label||'';
   el('s-preset').value=S.preset; syncSettingLabel();
-  await refreshData(); updateDt(); setInterval(updateDt,1000);
+  await refreshData();
 }
 
-/* ── Clock ─────────────────────────────────── */
+/* ── Clock & DateTime ──────────────────────── */
 const DN=['Minggu','Senin','Selasa','Rabu','Kamis','Jumat','Sabtu'];
 const MN=['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
-function startClock(){ const t=()=>{ el('clock').textContent=new Date().toLocaleTimeString('id-ID',{hour:'2-digit',minute:'2-digit',second:'2-digit'}); }; t(); setInterval(t,1000); }
-function updateDt(){ const n=new Date(); el('right-dt').textContent=`${DN[n.getDay()]}, ${n.getDate()} ${MN[n.getMonth()]} ${n.getFullYear()}  ·  ${n.toLocaleTimeString('id-ID',{hour:'2-digit',minute:'2-digit',second:'2-digit'})}`; }
+function startClock(){
+  const t=()=>{
+    const n=new Date();
+    el('nav-time').textContent=n.toLocaleTimeString('id-ID',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
+    el('nav-date').textContent=`${DN[n.getDay()]}, ${n.getDate()} ${MN[n.getMonth()]} ${n.getFullYear()}`;
+  };
+  t(); setInterval(t,1000);
+}
+
+/* ── Dark/Light Theme ──────────────────────── */
+function toggleTheme(){
+  const isDark=document.documentElement.classList.toggle('dark');
+  el('theme-icon').className = isDark ? 'bi bi-sun-fill' : 'bi bi-moon-fill';
+  localStorage.setItem('theme', isDark ? 'dark' : 'light');
+}
 
 /* ── Camera ────────────────────────────────── */
 async function loadCams(){
-  const d=await (await fetch('/api/cameras')).json();
   const s=el('s-cam'); s.innerHTML='';
+  // Coba dapatkan nama device asli dari browser
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({video:true});
+    stream.getTracks().forEach(t=>t.stop());
+    const devices = await navigator.mediaDevices.enumerateDevices();
+    const videoDevices = devices.filter(d=>d.kind==='videoinput');
+    if(videoDevices.length > 0){
+      videoDevices.forEach((d,i)=>{
+        const o=document.createElement('option');
+        o.value=i;
+        o.textContent=d.label||`Camera ${i}`;
+        s.appendChild(o);
+      });
+      return;
+    }
+  } catch(e){}
+  // Fallback ke API backend
+  const d=await (await fetch('/api/cameras')).json();
   (d.cameras||[]).forEach(c=>{ const o=document.createElement('option'); o.value=c.index; o.textContent=c.name; s.appendChild(o); });
 }
 async function toggleCamera(){ S.running?await stopCam():await startCam(); }
@@ -729,9 +937,22 @@ function renderTable(records){
 async function refreshData(){ const d=await (await fetch('/api/data/today')).json(); renderTable(d.records||[]); }
 async function clearSelected(){
   if(!S.sel.size){ toast('Perhatian','Pilih data terlebih dahulu.','warning'); return; }
-  if(!confirm(`Hapus ${S.sel.size} item?`)) return;
+  const ok = await showConfirm(`Apakah kamu yakin ingin menghapus <strong>${S.sel.size} item</strong> yang dipilih? Tindakan ini tidak dapat dibatalkan.`);
+  if(!ok) return;
   const d=await (await fetch('/api/data/delete',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({ids:[...S.sel]})})).json();
   if(d.ok){ toast('Sukses',`${S.sel.size} data dihapus.`,'success'); await refreshData(); } else toast('Error',d.msg,'danger');
+}
+
+/* ── Custom Confirm ─────────────────────────── */
+let _confirmResolve = null;
+function showConfirm(msg){
+  el('confirm-msg').innerHTML = msg;
+  el('confirm-overlay').classList.add('show');
+  return new Promise(res => { _confirmResolve = res; });
+}
+function closeConfirm(result){
+  el('confirm-overlay').classList.remove('show');
+  if(_confirmResolve){ _confirmResolve(result); _confirmResolve=null; }
 }
 
 /* ── Success popup ─────────────────────────── */
@@ -747,9 +968,10 @@ function openSetting(){
 }
 function syncSettingLabel(){
   const types=el('s-preset').value==='DIN'?S.din:S.jis;
-  const s=el('s-label'); s.innerHTML='';
-  types.forEach(t=>{ const o=document.createElement('option'); o.value=t; o.textContent=t; if(t==='Select Label . . .') o.disabled=true; s.appendChild(o); });
-  if(S.label&&types.includes(S.label)) s.value=S.label; else s.value=types[0]||'';
+  const options=types.map(t=>({value:t, label:t, disabled:t==='Select Label . . .'}));
+  ssPopulate('ss-label-wrap','s-label', options);
+  const cur = S.label && types.includes(S.label) ? S.label : (types[1]||'');
+  ssSetValue('ss-label-wrap','s-label', cur);
 }
 async function saveSetting(){
   const p=el('s-preset').value, l=el('s-label').value;
@@ -773,12 +995,18 @@ function populateXMonth(){
 }
 function populateXLabel(){
   const pv=el('x-preset').value, act=pv==='Preset'?S.preset:pv, types=act==='DIN'?S.din:S.jis;
-  const s=el('x-label'); s.innerHTML='<option value="All Label">All Label</option>';
-  types.slice(1).forEach(t=>{ const o=document.createElement('option'); o.value=t; o.textContent=t; s.appendChild(o); });
-  if(S.label&&[...s.options].some(o=>o.value===S.label)) s.value=S.label;
+  const options=[{value:'All Label',label:'All Label'},...types.slice(1).map(t=>({value:t,label:t}))];
+  ssPopulate('ss-xlabel-wrap','x-label', options);
+  const cur = S.label && [...options].some(o=>o.value===S.label) ? S.label : 'All Label';
+  ssSetValue('ss-xlabel-wrap','x-label', cur);
 }
 function onXDate(){ S.xrange=document.querySelector('input[name="xdate"]:checked').value; }
-function onXLabelChk(){ el('x-label').disabled=!el('x-lchk').checked; }
+function onXLabelChk(){
+  const disabled=!el('x-lchk').checked;
+  const wrap=el('ss-xlabel-wrap');
+  if(disabled){ wrap.style.opacity='.5'; wrap.style.pointerEvents='none'; }
+  else { wrap.style.opacity=''; wrap.style.pointerEvents=''; }
+}
 function onXMonthChk(){
   const c=el('x-mchk').checked; el('x-month').disabled=!c; el('x-year').disabled=!c;
   if(c){ el('x-dchk').checked=false; onXDateChk_off(); el('rb-all').checked=true; el('rb-today').disabled=true; S.xrange='Month'; }
@@ -818,6 +1046,71 @@ const show = e => { if(typeof e==='string') el(e).style.display='block'; else e.
 const showEl = id => el(id).style.display='flex';
 const hide = e => { if(typeof e==='string') el(e).style.display='none'; else e.style.display='none'; };
 function dlFile(url,name){ const a=document.createElement('a'); a.href=url; a.download=name; document.body.appendChild(a); a.click(); a.remove(); }
+
+/* ── Searchable Select ──────────────────────── */
+const _ssData = {}; // wrapId -> [{value,label,disabled}]
+
+function ssPopulate(wrapId, hiddenId, options){
+  _ssData[wrapId] = options;
+  _ssRender(wrapId, hiddenId, '');
+}
+
+function _ssRender(wrapId, hiddenId, query){
+  const drop = el(wrapId).querySelector('.ss-dropdown');
+  const cur = el(hiddenId).value;
+  const items = (_ssData[wrapId]||[]).filter(o=>
+    !query || o.label.toLowerCase().includes(query.toLowerCase())
+  );
+  if(!items.length){ drop.innerHTML='<div class="ss-empty">Tidak ditemukan</div>'; return; }
+  drop.innerHTML = items.map(o=>`
+    <div class="ss-option${o.disabled?' disabled':''}${o.value===cur?' selected':''}"
+      data-val="${o.value}" data-wrap="${wrapId}" data-hid="${hiddenId}"
+      onclick="ssSelect(this)">${o.label}</div>`).join('');
+}
+
+function ssSelect(el_opt){
+  if(el_opt.classList.contains('disabled')) return;
+  const wrapId=el_opt.dataset.wrap, hiddenId=el_opt.dataset.hid, val=el_opt.dataset.val;
+  const data=(_ssData[wrapId]||[]).find(o=>o.value===val);
+  el(hiddenId).value = val;
+  const wrap=el(wrapId);
+  wrap.querySelector('input').value = data?data.label:'';
+  wrap.classList.remove('open');
+  _ssRender(wrapId, hiddenId, '');
+}
+
+function ssToggle(wrapId){
+  const wrap=el(wrapId);
+  const isOpen=wrap.classList.contains('open');
+  // Close all others
+  document.querySelectorAll('.ss-wrap.open').forEach(w=>w.classList.remove('open'));
+  if(!isOpen){ wrap.classList.add('open'); wrap.querySelector('input').focus(); }
+}
+
+function ssFilter(wrapId, hiddenId){
+  const q=el(wrapId).querySelector('input').value;
+  _ssRender(wrapId, hiddenId, q);
+  if(!el(wrapId).classList.contains('open')) el(wrapId).classList.add('open');
+}
+
+function ssSetValue(wrapId, hiddenId, val){
+  const data=(_ssData[wrapId]||[]).find(o=>o.value===val);
+  el(hiddenId).value = data?data.value:'';
+  const inp=el(wrapId).querySelector('input');
+  if(inp) inp.value = data?data.label:'';
+  _ssRender(wrapId, hiddenId, '');
+}
+
+// Close on outside click
+document.addEventListener('click', e=>{
+  if(!e.target.closest('.ss-wrap')){
+    document.querySelectorAll('.ss-wrap.open').forEach(w=>{
+      w.classList.remove('open');
+      // Reset search text to current value
+      const hid=w.querySelector('input[type=hidden]')||w.nextElementSibling;
+    });
+  }
+});
 
 init();
 </script>
