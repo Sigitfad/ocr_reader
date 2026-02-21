@@ -1,104 +1,64 @@
-#Konfigurasi PENGATURAN dan pengaturan aplikasi QC_GS-Battery
-#File ini berisi semua PENGATURAN yang digunakan di seluruh aplikasi untuk setup global
-#Tujuan: Centralized configuration untuk semua constants dan settings aplikasi
-#Fungsi: Menyediakan satu tempat untuk manage semua configuration values
+import os
+from PIL import Image  # PIL digunakan untuk mendeteksi versi resampling yang tersedia
 
-import os #File system operations | Modul untuk operasi file system (buat folder, cek path, dll)
-from PIL import Image #Image processing library | Library untuk proses image (resize, format, dll)
+# ── Informasi Aplikasi ────────────────────────────────────────────────────────
+APP_NAME = "QC_GS-Battery"   # Nama aplikasi yang ditampilkan di UI
+APP_VERSION = "1.0.0"        # Versi aplikasi
 
-#PENGATURAN APLIKASI
-#Nilai-nilai tetap yang digunakan di seluruh aplikasi untuk konfigurasi umum
-#Tujuan: Define basic application information dan window dimensions
-APP_NAME = "QC_GS-Battery"  #Nama aplikasi utama | Tampil di window title dan UI
-APP_VERSION = "1.0.0" #Versi aplikasi | Untuk tracking version updates
-WINDOW_WIDTH = 1293 #Lebar window utama (pixels) | Ukuran default window saat dibuka
-WINDOW_HEIGHT = 720 #Tinggi window utama (pixels) | Ukuran default window saat dibuka
-CONTROL_PANEL_WIDTH = 280 #Lebar panel kontrol sebelah kiri (pixels) | Tempat buttons dan controls
-RIGHT_PANEL_WIDTH = 280 #Lebar panel kanan untuk data display (pixels) | Tempat tabel dan export
+# ── Ukuran Jendela Aplikasi (GUI) ─────────────────────────────────────────────
+WINDOW_WIDTH = 1293           # Lebar total jendela aplikasi (px)
+WINDOW_HEIGHT = 720           # Tinggi total jendela aplikasi (px)
+CONTROL_PANEL_WIDTH = 280     # Lebar panel kontrol di sisi kiri (px)
+RIGHT_PANEL_WIDTH = 280       # Lebar panel info di sisi kanan (px)
 
-#DIREKTORI
-#Path folder untuk menyimpan berbagai jenis file aplikasi
-#Tujuan: Define storage locations untuk images, exports, dan database
-IMAGE_DIR = "images" #Direktori untuk menyimpan gambar scan | Folder tempat screenshot kamera disimpan
-EXCEL_DIR = "file_excel" #Direktori untuk menyimpan file Excel export | Folder tempat file export di-save
-DB_FILE = "detection.db" #File database SQLite | Database file untuk menyimpan semua deteksi
+# ── Direktori dan File Penyimpanan ────────────────────────────────────────────
+IMAGE_DIR = "images"          # Folder untuk menyimpan gambar hasil deteksi
+EXCEL_DIR = "file_excel"      # Folder untuk menyimpan file Excel hasil export
+DB_FILE = "detection.db"      # Nama file database SQLite
 
-#KAMERA
-#PENGATURAN untuk konfigurasi kamera dan pengolahan frame
-#Tujuan: Define camera resolution dan processing parameters
-CAMERA_WIDTH = 1280 #Resolusi lebar kamera (pixels) | Ukuran capture dari kamera
-CAMERA_HEIGHT = 720 #Resolusi tinggi kamera (pixels) | Ukuran capture dari kamera
-TARGET_WIDTH = 640 #Lebar target untuk tampilan (pixels) | Ukuran display di UI
-TARGET_HEIGHT = 640 #Tinggi target untuk tampilan (pixels) | Ukuran display di UI
-BUFFER_SIZE = 1 #Ukuran buffer kamera (untuk mengurangi lag) | Jumlah frame yang di-buffer
-SCAN_INTERVAL = 2.0 #Interval scan OCR (detik) | Berapa lama tunggu sebelum scan ulang
-MAX_CAMERAS = 5 #Maksimal kamera yang dicek | Berapa banyak index kamera yang di-test
+# ── Pengaturan Kamera dan Pemrosesan Gambar ───────────────────────────────────
+CAMERA_WIDTH = 1280           # Resolusi lebar frame dari kamera (px)
+CAMERA_HEIGHT = 720           # Resolusi tinggi frame dari kamera (px)
+TARGET_WIDTH = 640            # Lebar gambar setelah di-resize untuk OCR (px)
+TARGET_HEIGHT = 640           # Tinggi gambar setelah di-resize untuk OCR (px)
+BUFFER_SIZE = 1               # Jumlah frame yang di-buffer (1 = tanpa buffer berlebih)
+SCAN_INTERVAL = 2.0           # Jeda antar scan OCR dalam detik
+MAX_CAMERAS = 5               # Maksimal kamera yang dicoba saat deteksi otomatis
 
-#PENGATURAN RESAMPLING GAMBAR (KOMPATIBILITAS PILLOW)
-#Pillow adalah library Python yang digunakan untuk mengolah gambar,
-#seperti membaca, mengubah ukuran, dan memproses gambar.
-#Tujuan: Setup image resampling method yang compatible dengan berbagai versi Pillow
-#Fungsi: Fallback mechanism untuk support Pillow versi lama dan baru
-
-#Resampling adalah proses menghitung ulang piksel gambar
-#saat gambar diperbesar atau diperkecil agar hasilnya tetap bagus.
-
-#LANCZOS adalah metode resampling dengan kualitas tinggi
-#yang menghasilkan gambar lebih halus dan tajam,
-#sangat cocok untuk memperkecil atau memperbesar gambar.
-
-#ANTIALIAS adalah metode lama untuk menghaluskan gambar agar tidak terlihat pecah, biasanya tersedia di Pillow versi lama.
-
+# ── Kompatibilitas Resampling PIL ─────────────────────────────────────────────
+# Pillow versi baru menggunakan Image.Resampling.LANCZOS,
+# versi lama menggunakan Image.LANCZOS, dan yang sangat lama menggunakan Image.ANTIALIAS
 try:
-    #Coba gunakan metode LANCZOS dari Pillow versi terbaru (10.0+)
-    #Jika tersedia, ini adalah pilihan terbaik untuk kualitas gambar
-    Resampling = Image.Resampling.LANCZOS
+    Resampling = Image.Resampling.LANCZOS   # Pillow >= 9.1.0
 
 except AttributeError:
     try:
-        #Jika Pillow versi lama tidak memiliki Image.Resampling
-        #Gunakan LANCZOS versi lama agar tetap kompatibel (Pillow 9.x)
-        Resampling = Image.LANCZOS
+        Resampling = Image.LANCZOS           # Pillow lama
 
     except AttributeError:
-        #Jika Pillow sangat lama dan LANCZOS tidak tersedia (Pillow < 9)
-        #Gunakan ANTIALIAS sebagai pilihan terakhir
-        Resampling = Image.ANTIALIAS
+        Resampling = Image.ANTIALIAS         # Pillow sangat lama (fallback terakhir)
 
+# ── Preset dan Pola Regex Deteksi ─────────────────────────────────────────────
+PRESETS = ["JIS", "DIN"]  # Dua jenis standar baterai yang didukung
 
-#PRESET DAN POLA
-#Preset format dan pattern OCR untuk deteksi kode yang berbeda
-#Tujuan: Define available presets dan regex patterns untuk OCR matching
-PRESETS = ["JIS", "DIN"]  #Daftar preset yang tersedia | Format kode yang bisa dideteksi
-
-#Pattern format: [2-4 HURUF] [ANGKA][HURUF OPSIONAL] [HURUF OPSIONAL]
-#Contoh DIN: LBN 1, LN0 260A, LN4 776A ISS
-#Contoh JIS: 26A17, 28B19L, 50D23R(S)
+# Pola regex untuk mencocokkan kode baterai sesuai standar JIS dan DIN
 PATTERNS = {
+    # JIS: contoh kode → 55D23L, 80D31R(S), 26A17
     "JIS": r"\b\d{2,3}[A-H]\d{2,3}[LR]?(?:\(S\))?\b",
-    #DIN pattern support semua format:
-    #LBN 1/2/3
-    #LN0-LN6 tanpa kapasitas
-    #LN0-LN6 + kapasitas: LN4 776A, LN4 776A ISS, LN4 650A, LN6 1000A
-    #Reverse format: [angka]LN[0-6] contoh: 650LN4, 1000LN6
+    # DIN: contoh kode → LBN 1, LN3 600A, 490LN3
     "DIN": r"(?:LBN\s*\d|LN[0-6](?:\s+\d{2,4}[A-Z]?(?:\s+ISS)?)?|\d{2,4}LN[0-6])"
 }
 
-#ALLOWLIST KARAKTER OCR
-#Karakter yang diizinkan dalam OCR untuk mengurangi false positive detection
-#Tujuan: Limit OCR recognition ke karakter yang valid saja
-#Fungsi: Improve OCR accuracy dengan membatasi character set
-ALLOWLIST_JIS = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYLRS()'  #Karakter yang diizinkan untuk JIS OCR | Validasi hasil OCR JIS
-ALLOWLIST_DIN = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ '     #Karakter yang diizinkan untuk DIN OCR | Validasi hasil OCR DIN
+# Karakter yang diizinkan saat OCR membaca kode JIS (filter noise karakter lain)
+ALLOWLIST_JIS = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYLRS()'
+# Karakter yang diizinkan saat OCR membaca kode DIN
+ALLOWLIST_DIN = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ '
 
-#JIS TYPES (LABEL)
-#Daftar semua tipe/label JIS yang valid untuk dipilih user
-#Tujuan: Provide complete list of valid JIS battery codes
-#Fungsi: Digunakan untuk validasi input user dan dropdown options
-#Format JIS: [Capacity][Type Letter][Size][Terminal (L/R)][Special Marker (S)]
-#Contoh: 50D23R(S) = 50 capacity, D type, 23 size, R terminal, (S) special
+# ── Daftar Label Baterai JIS ──────────────────────────────────────────────────
+# Format: [kapasitas][grup][tinggi][arah terminal][opsional(S)]
+# Contoh: 55D23L = 55Ah, grup D, tinggi 23cm, terminal kiri
 JIS_TYPES = [
-    "Select Label . . .",  #Placeholder - tidak valid untuk scanning
+    "Select Label . . .",
     "26A17", "26A17L", "26A17R", "26A17L(S)", "26A17R(S)",
     "26A19", "26A19L", "26A19R", "26A19L(S)", "26A19R(S)",
     "28A19", "28A19L", "28A19R", "28A19L(S)", "28A19R(S)",
@@ -173,19 +133,14 @@ JIS_TYPES = [
     "245H52", "245H52L", "245H52R", "245H52L(S)", "245H52R(S)",
 ]
 
-#DIN TYPES (LABEL)
-#Daftar semua tipe/label DIN yang valid untuk dipilih user
-#Tujuan: Provide complete list of valid DIN battery codes
-#Fungsi: Digunakan untuk validasi input user dan dropdown options
-#Format DIN: [Prefix] [Capacity+Letter] [Optional ISS marker]
-#Contoh: LN4 776A ISS = LN4 prefix, 776A capacity rating, ISS marker
+# ── Daftar Label Baterai DIN ──────────────────────────────────────────────────
+# Format DIN Eropa: LBN/LN diikuti nomor ukuran dan kapasitas arus (Ampere)
+# Contoh: LN3 600A = tipe LN3 dengan arus 600A; 490LN3 = format terbalik (CCA dulu)
 DIN_TYPES = [
-    "Select Label . . .",  #Placeholder - tidak valid untuk scanning
+    "Select Label . . .",
     "LBN 1", "LBN 2", "LBN 3",
     "LN1", "LN2", "LN3", "LN4", "LN5", "LN6",
     "LN4 776A ISS",
-
-    #Daftar DIN dengan LN didepan
     "LN0 250A", "LN0 260A", "LN0 270A", "LN0 280A", "LN0 300A", "LN0 320A", "LN0 330A",
     "LN0 335A", "LN0 350A", "LN0 360A", "LN0 380A", "LN0 400A",
     "LN1 250A", "LN1 270A", "LN1 280A", "LN1 295A", "LN1 300A", "LN1 320A",
@@ -203,8 +158,6 @@ DIN_TYPES = [
     "LN5 800A", "LN5 820A", "LN5 850A", "LN5 880A", "LN5 900A", "LN5 920A",
     "LN6 750A", "LN6 780A", "LN6 800A", "LN6 820A", "LN6 850A", "LN6 880A",
     "LN6 900A", "LN6 920A", "LN6 950A", "LN6 980A", "LN6 1000A", "LN6 1050A", "LN6 1100A",
-
-    #Daftar DIN dengan LN dibelakang
     "260LN0", "295LN1", "450LN1", "345LN2", "360LN2", "490LN3", "650LN4",
     "250LN0", "270LN0", "280LN0", "300LN0", "320LN0", "330LN0",
     "335LN0", "350LN0", "360LN0", "380LN0", "400LN0",
@@ -225,16 +178,11 @@ DIN_TYPES = [
     "900LN6", "920LN6", "950LN6", "980LN6", "1000LN6", "1050LN6", "1100LN6",
 ]
 
-#MONTHS
-#Daftar bulan dalam bahasa Indonesia untuk dropdown date selection
-#Tujuan: Provide month names untuk date picker dan export dialog
-#Fungsi: User-friendly month selection dalam bahasa Indonesia
+# ── Daftar Nama Bulan untuk Filter Export ─────────────────────────────────────
 MONTHS = ["January", "February", "March", "April", "May", "June", 
-          "July", "August", "September", "Oktober", "November", "Desember"]
+        "July", "August", "September", "Oktober", "November", "Desember"]
 
-#Mapping nama bulan ke nomor bulan (1-12)
-#Tujuan: Convert nama bulan Indonesia ke integer untuk date processing
-#Fungsi: Digunakan saat build date range untuk export filtering
+# Pemetaan nama bulan ke angka, digunakan untuk membangun query SQL filter per bulan
 MONTH_MAP = {
     "January": 1, "February": 2, "March": 3, "April": 4, "May": 5, "June": 6, 
     "July": 7, "August": 8, "September": 9, "Oktober": 10, "November": 11, "Desember": 12

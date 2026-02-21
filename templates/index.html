@@ -277,8 +277,8 @@ select:focus, input[type=date]:focus { border-color: var(--accent); box-shadow: 
   border: 1px solid rgba(255,255,255,.1);
   text-align: center; display: none; z-index: 5;
 }
-#result-code   { font-family: var(--mono); font-size: 18px; letter-spacing: 2px; }
-#result-status { font-size: 11px; letter-spacing: 1.5px; text-transform: uppercase; color: #888; margin-top: 3px; }
+#result-code   { font-family: 'Montserrat', sans-serif; font-size: 18px; letter-spacing: 2px; }
+#result-status { font-family: 'Montserrat', sans-serif; font-size: 11px; letter-spacing: 1.5px; text-transform: uppercase; color: #888; margin-top: 3px; }
 
 #file-dropzone {
   display: none; position: absolute; inset: 0; z-index: 6;
@@ -886,10 +886,15 @@ async function doScan(file){
 function resetScanBtn(){ const b=el('btn-scan'); b.innerHTML='<i class="bi bi-image"></i> Scan from File'; b.disabled=false; }
 
 /* ── Result Badge ──────────────────────────── */
+let _badgeTimer = null;
 function showBadge(code,status,color){
   const b=el('result-badge'), c=el('result-code'), s=el('result-status');
   const colors={green:'var(--green)',red:'var(--red)',amber:'var(--amber)'};
   c.textContent=code; c.style.color=colors[color]||'#fff'; s.textContent=status; show(b);
+  if(_badgeTimer){ clearTimeout(_badgeTimer); _badgeTimer=null; }
+  if(status==='DETECTED'){
+    _badgeTimer=setTimeout(()=>{ hide(b); _badgeTimer=null; }, 3000);
+  }
 }
 
 /* ── OCR ────────────────────────────────────── */

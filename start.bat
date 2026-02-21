@@ -1,7 +1,8 @@
 @echo off
 title QC Battery Inspection Cardboard
 
-set PROJECT_DIR=C:\Users\ACER NITRO\OneDrive\Desktop\OCR-METODE\web_ocr
+set PROJECT_DIR=C:\Users\ACER NITRO\OneDrive\Desktop\OCR_JS\ocrweb_capt
+
 :: set FLAG_FILE=.installed
 
 cd /d "%PROJECT_DIR%" 2>nul || (echo Folder tidak ditemukan: %PROJECT_DIR% & pause & exit /b)
