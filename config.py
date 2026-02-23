@@ -1,62 +1,58 @@
-import os
-from PIL import Image  # PIL digunakan untuk mendeteksi versi resampling yang tersedia
+import os  #operasi file, direktori, dan path untuk manajemen file gambar
+from PIL import Image  #PIL digunakan untuk mendeteksi versi resampling yang tersedia
 
-# ── Informasi Aplikasi ────────────────────────────────────────────────────────
-APP_NAME = "QC_GS-Battery"   # Nama aplikasi yang ditampilkan di UI
-APP_VERSION = "1.0.0"        # Versi aplikasi
+#informasi Aplikasi
+APP_NAME = "QC_GS-Battery" #nama aplikasi yang ditampilkan di UI
+APP_VERSION = "1.0.0"      #versi aplikasi
 
-# ── Ukuran Jendela Aplikasi (GUI) ─────────────────────────────────────────────
-WINDOW_WIDTH = 1293           # Lebar total jendela aplikasi (px)
-WINDOW_HEIGHT = 720           # Tinggi total jendela aplikasi (px)
-CONTROL_PANEL_WIDTH = 280     # Lebar panel kontrol di sisi kiri (px)
-RIGHT_PANEL_WIDTH = 280       # Lebar panel info di sisi kanan (px)
+#ukuran Jendela Aplikasi (GUI)
+WINDOW_WIDTH = 1280        #lebar total jendela aplikasi (px)
+WINDOW_HEIGHT = 720        #tinggi total jendela aplikasi (px)
+CONTROL_PANEL_WIDTH = 280  #lebar panel kontrol di sisi kiri (px)
+RIGHT_PANEL_WIDTH = 280    #lebar panel info di sisi kanan (px)
 
-# ── Direktori dan File Penyimpanan ────────────────────────────────────────────
-IMAGE_DIR = "images"          # Folder untuk menyimpan gambar hasil deteksi
-EXCEL_DIR = "file_excel"      # Folder untuk menyimpan file Excel hasil export
-DB_FILE = "detection.db"      # Nama file database SQLite
+#direktori dan file penyimpanan
+IMAGE_DIR = "images"       #folder untuk menyimpan gambar hasil deteksi
+EXCEL_DIR = "file_excel"   #folder untuk menyimpan file Excel hasil export
+DB_FILE = "detection.db"   #nama file database SQLite
 
-# ── Pengaturan Kamera dan Pemrosesan Gambar ───────────────────────────────────
-CAMERA_WIDTH = 1280           # Resolusi lebar frame dari kamera (px)
-CAMERA_HEIGHT = 720           # Resolusi tinggi frame dari kamera (px)
-TARGET_WIDTH = 640            # Lebar gambar setelah di-resize untuk OCR (px)
-TARGET_HEIGHT = 640           # Tinggi gambar setelah di-resize untuk OCR (px)
-BUFFER_SIZE = 1               # Jumlah frame yang di-buffer (1 = tanpa buffer berlebih)
-SCAN_INTERVAL = 2.0           # Jeda antar scan OCR dalam detik
-MAX_CAMERAS = 5               # Maksimal kamera yang dicoba saat deteksi otomatis
+#pengaturan Kamera dan pemrosesan gambar
+CAMERA_WIDTH = 1280   #resolusi lebar frame dari kamera (px)
+CAMERA_HEIGHT = 720   #resolusi tinggi frame dari kamera (px)
+TARGET_WIDTH = 640    #lebar gambar setelah di-resize untuk OCR (px)
+TARGET_HEIGHT = 640   #tinggi gambar setelah di-resize untuk OCR (px)
+BUFFER_SIZE = 1       #jumlah frame yang di-buffer (1 = tanpa buffer berlebih)
+SCAN_INTERVAL = 2.0   #jeda antar scan ocr dalam detik
+MAX_CAMERAS = 5       #maksimal kamera yang dicoba saat deteksi otomatis
 
-# ── Kompatibilitas Resampling PIL ─────────────────────────────────────────────
-# Pillow versi baru menggunakan Image.Resampling.LANCZOS,
-# versi lama menggunakan Image.LANCZOS, dan yang sangat lama menggunakan Image.ANTIALIAS
+#kompatibilitas resampling PIL
+#pillow versi baru menggunakan Image.Resampling.LANCZOS,
+#versi lama menggunakan Image.LANCZOS, dan yang sangat lama menggunakan Image.ANTIALIAS
 try:
-    Resampling = Image.Resampling.LANCZOS   # Pillow >= 9.1.0
+    Resampling = Image.Resampling.LANCZOS #pillow >= 9.1.0
 
 except AttributeError:
     try:
-        Resampling = Image.LANCZOS           # Pillow lama
+        Resampling = Image.LANCZOS #pillow lama
 
     except AttributeError:
-        Resampling = Image.ANTIALIAS         # Pillow sangat lama (fallback terakhir)
+        Resampling = Image.ANTIALIAS #pillow sangat lama (fallback terakhir)
 
-# ── Preset dan Pola Regex Deteksi ─────────────────────────────────────────────
-PRESETS = ["JIS", "DIN"]  # Dua jenis standar baterai yang didukung
+#preset dan pola regex deteksi
+PRESETS = ["JIS", "DIN"]  #dua jenis standar baterai yang didukung
 
-# Pola regex untuk mencocokkan kode baterai sesuai standar JIS dan DIN
+#pola regex untuk mencocokkan kode baterai sesuai standar JIS dan DIN
 PATTERNS = {
-    # JIS: contoh kode → 55D23L, 80D31R(S), 26A17
     "JIS": r"\b\d{2,3}[A-H]\d{2,3}[LR]?(?:\(S\))?\b",
-    # DIN: contoh kode → LBN 1, LN3 600A, 490LN3
     "DIN": r"(?:LBN\s*\d|LN[0-6](?:\s+\d{2,4}[A-Z]?(?:\s+ISS)?)?|\d{2,4}LN[0-6])"
 }
 
-# Karakter yang diizinkan saat OCR membaca kode JIS (filter noise karakter lain)
+#karakter yang diizinkan saat ocr membaca kode JIS (filter noise karakter lain)
 ALLOWLIST_JIS = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYLRS()'
-# Karakter yang diizinkan saat OCR membaca kode DIN
+#karakter yang diizinkan saat OCR membaca kode DIN
 ALLOWLIST_DIN = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ '
 
-# ── Daftar Label Baterai JIS ──────────────────────────────────────────────────
-# Format: [kapasitas][grup][tinggi][arah terminal][opsional(S)]
-# Contoh: 55D23L = 55Ah, grup D, tinggi 23cm, terminal kiri
+#daftar label baterai JIS
 JIS_TYPES = [
     "Select Label . . .",
     "26A17", "26A17L", "26A17R", "26A17L(S)", "26A17R(S)",
@@ -133,9 +129,7 @@ JIS_TYPES = [
     "245H52", "245H52L", "245H52R", "245H52L(S)", "245H52R(S)",
 ]
 
-# ── Daftar Label Baterai DIN ──────────────────────────────────────────────────
-# Format DIN Eropa: LBN/LN diikuti nomor ukuran dan kapasitas arus (Ampere)
-# Contoh: LN3 600A = tipe LN3 dengan arus 600A; 490LN3 = format terbalik (CCA dulu)
+#daftar label baterai DIN
 DIN_TYPES = [
     "Select Label . . .",
     "LBN 1", "LBN 2", "LBN 3",
@@ -178,11 +172,11 @@ DIN_TYPES = [
     "900LN6", "920LN6", "950LN6", "980LN6", "1000LN6", "1050LN6", "1100LN6",
 ]
 
-# ── Daftar Nama Bulan untuk Filter Export ─────────────────────────────────────
+#daftar nama bulan untuk filter export
 MONTHS = ["January", "February", "March", "April", "May", "June", 
         "July", "August", "September", "Oktober", "November", "Desember"]
 
-# Pemetaan nama bulan ke angka, digunakan untuk membangun query SQL filter per bulan
+#pemetaan nama bulan ke angka, digunakan untuk membangun query sql filter per bulan
 MONTH_MAP = {
     "January": 1, "February": 2, "March": 3, "April": 4, "May": 5, "June": 6, 
     "July": 7, "August": 8, "September": 9, "Oktober": 10, "November": 11, "Desember": 12

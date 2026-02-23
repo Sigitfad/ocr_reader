@@ -12,7 +12,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.min.js"></script>
 
 <style>
-/* ── Design Tokens ─────────────────────────────── */
+/* Design Tokens */
 :root {
   --bg:        #f5f6f8;
   --surface:   #ffffff;
@@ -42,7 +42,7 @@
   --shadow-md: 0 4px 16px rgba(0,0,0,.08);
 }
 
-/* ── DARK MODE ──────────────────────────────────── */
+/* DARK MODE */
 html.dark {
   --bg:        #0f1117;
   --surface:   #1a1d27;
@@ -82,7 +82,7 @@ html.dark .ss-input-box input { background: transparent; color: var(--text-1); }
 html.dark .ss-dropdown { background: var(--surface); border-color: var(--border); }
 html.dark .ss-option:hover { background: var(--surface-2); }
 
-/* ── Dark Mode Toggle Button ────────────────────── */
+/* Dark Mode Toggle Button */
 #theme-btn {
   width: 36px; height: 36px; border-radius: 50%;
   border: 1px solid var(--border); background: var(--surface-2);
@@ -99,7 +99,7 @@ html, body { height: 100%; overflow: hidden; font-family: var(--font); font-size
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: var(--border-2); border-radius: 99px; }
 
-/* ── TOPBAR ─────────────────────────────────────── */
+/* TOPBAR */
 #topbar {
   height: 54px; background: var(--surface);
   border-bottom: 1px solid var(--border);
@@ -133,10 +133,10 @@ html, body { height: 100%; overflow: hidden; font-family: var(--font); font-size
 #cam-badge.on .dot { background: var(--green); animation: pulse 1.6s infinite; }
 @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.3} }
 
-/* ── LAYOUT ─────────────────────────────────────── */
+/* LAYOUT */
 #app { display: flex; height: calc(100vh - 54px); overflow: hidden; }
 
-/* ── SIDE PANELS ────────────────────────────────── */
+/* SIDE PANELS */
 .panel {
   background: var(--surface);
   border-right: 1px solid var(--border);
@@ -147,7 +147,7 @@ html, body { height: 100%; overflow: hidden; font-family: var(--font); font-size
 #left-panel  { width: 360px; }
 #right-panel { width: 430px; border-right: none; border-left: 1px solid var(--border); }
 
-/* ── SECTION LABEL ──────────────────────────────── */
+/* SECTION LABEL */
 .label {
   font-size: 13px; font-weight: 700; letter-spacing: 1.4px;
   text-transform: uppercase; color: #3b4a6b;
@@ -155,7 +155,7 @@ html, body { height: 100%; overflow: hidden; font-family: var(--font); font-size
 }
 html.dark .label { color: #93c5fd; }
 
-/* ── SELECT / INPUT ─────────────────────────────── */
+/* SELECT / INPUT */
 select, input[type=date] {
   width: 100%; padding: 11px 14px;
   background: var(--surface); border: 1px solid var(--border);
@@ -168,7 +168,7 @@ select:focus, input[type=date]:focus { border-color: var(--accent); box-shadow: 
 .sel-wrap { position: relative; }
 .sel-wrap::after { content: '\f282'; font-family: 'bootstrap-icons'; position: absolute; right: 11px; top: 50%; transform: translateY(-50%); color: var(--text-3); pointer-events: none; font-size: 12px; }
 
-/* ── TOGGLE SWITCH ──────────────────────────────── */
+/* TOGGLE SWITCH */
 .opt-row { display: flex; align-items: center; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid var(--border); }
 .opt-row:last-child { border-bottom: none; }
 .opt-name { font-size: 14px; color: var(--text-2); font-weight: 400; }
@@ -179,7 +179,7 @@ select:focus, input[type=date]:focus { border-color: var(--accent); box-shadow: 
 .tog-thumb { position: absolute; top: 4px; left: 4px; width: 14px; height: 14px; border-radius: 50%; background: var(--border-2); transition: all .2s; pointer-events: none; }
 .tog input:checked ~ .tog-thumb { transform: translateX(20px); background: #fff; }
 
-/* ── BUTTONS ────────────────────────────────────── */
+/* BUTTONS */
 .btn {
   display: flex; align-items: center; justify-content: center; gap: 8px;
   width: 100%; padding: 13px 18px; border: none; border-radius: var(--r);
@@ -201,6 +201,16 @@ select:focus, input[type=date]:focus { border-color: var(--accent); box-shadow: 
 .btn-success-state:hover { background: var(--green); color: #fff; }
 .btn-stop-state { background: var(--red); color: #fff; }
 .btn-stop-state:hover { background: #b91c1c; }
+.btn-loading-state { background: #e5e7eb; color: #6b7280; border: 1px solid #d1d5db; cursor: not-allowed; pointer-events: none; }
+@keyframes btn-spin { to { transform: rotate(360deg); } }
+.btn-loader {
+  width: 15px; height: 15px; flex-shrink: 0;
+  border: 2.5px solid #9ca3af;
+  border-top-color: #374151;
+  border-radius: 50%;
+  animation: btn-spin .7s linear infinite;
+  display: inline-block;
+}
 
 .btn-icon {
   width: 46px; flex-shrink: 0; padding: 13px 0;
@@ -211,7 +221,7 @@ select:focus, input[type=date]:focus { border-color: var(--accent); box-shadow: 
 }
 .btn-icon:hover { border-color: var(--border-2); color: var(--text-1); }
 
-/* ── SUCCESS POPUP ──────────────────────────────── */
+/* SUCCESS POPUP */
 #success-area { min-height: 50px; display: flex; align-items: center; }
 #success-popup {
   display: none; width: 100%;
@@ -222,7 +232,7 @@ select:focus, input[type=date]:focus { border-color: var(--accent); box-shadow: 
 }
 @keyframes fadeIn { from{opacity:0;transform:translateY(-4px)} to{opacity:1;transform:none} }
 
-/* ── OCR OUTPUT ─────────────────────────────────── */
+/* OCR OUTPUT */
 #ocr-box {
   min-height: 40px; max-height: 120px;
   border: 1px solid var(--border); border-radius: var(--r);
@@ -231,7 +241,7 @@ select:focus, input[type=date]:focus { border-color: var(--accent); box-shadow: 
 }
 .ocr-item { font-family: var(--mono); font-size: 12px; color: var(--text-2); padding: 2px 0; line-height: 1.8; }
 
-/* ── STATISTIK ──────────────────────────────────── */
+/* STATISTIK */
 .stat-label-pill {
   display: flex; align-items: center; justify-content: space-between;
   padding: 22px 22px; border-radius: var(--r);
@@ -251,7 +261,7 @@ select:focus, input[type=date]:focus { border-color: var(--accent); box-shadow: 
 .c-ok    { color: #1e40af; }
 .c-nok   { color: var(--red); }
 
-/* ── CENTER ─────────────────────────────────────── */
+/* CENTER */
 #center { flex: 1; background: #1a1a1a; display: flex; flex-direction: column; min-width: 0; position: relative; }
 
 #video-area { flex: 1; position: relative; display: flex; align-items: center; justify-content: center; min-height: 0; overflow: hidden; }
@@ -290,7 +300,7 @@ select:focus, input[type=date]:focus { border-color: var(--accent); box-shadow: 
 #file-dropzone.show { display: flex; }
 #file-dropzone:hover, #file-dropzone.drag-over { border-color: #888; color: #ccc; }
 
-/* ── RIGHT PANEL TABLE ──────────────────────────── */
+/* RIGHT PANEL TABLE */
 #table-wrap {
   flex: 1; min-height: 0; overflow-y: auto;
   border: 1px solid var(--border); border-radius: var(--r);
@@ -325,7 +335,7 @@ select:focus, input[type=date]:focus { border-color: var(--accent); box-shadow: 
 /* Override label size only for Data Barang heading */
 .data-head .label { font-size: 14px; letter-spacing: 1px; margin: 0; }
 
-/* ── MODAL ──────────────────────────────────────── */
+/* MODAL */
 .modal-content { border: 1px solid var(--border); border-radius: 12px; box-shadow: var(--shadow-md); }
 .modal-header  { padding: 16px 20px; border-bottom: 1px solid var(--border); background: var(--surface); border-radius: 12px 12px 0 0; }
 .modal-title   { font-size: 15px; font-weight: 600; color: var(--text-1); }
@@ -351,7 +361,7 @@ select:focus, input[type=date]:focus { border-color: var(--accent); box-shadow: 
 .progress-fill  { height: 100%; background: var(--accent); border-radius: 99px; transition: width .3s; width: 0%; }
 .progress-msg   { font-size: 11px; color: var(--text-3); text-align: center; margin-top: 6px; }
 
-/* ── SEARCHABLE SELECT ──────────────────────────── */
+/* SEARCHABLE SELECT */
 .ss-wrap { position: relative; width: 100%; }
 .ss-input-box {
   display: flex; align-items: center;
@@ -453,7 +463,7 @@ select:focus, input[type=date]:focus { border-color: var(--accent); box-shadow: 
 </head>
 <body>
 
-<!-- TOPBAR -->
+<!--TOPBAR-->
 <header id="topbar">
   <div class="brand">
     <div class="brand-dot"></div>
@@ -477,7 +487,7 @@ select:focus, input[type=date]:focus { border-color: var(--accent); box-shadow: 
 <!-- APP -->
 <div id="app">
 
-<!-- ── LEFT PANEL ── -->
+<!--LEFT PANEL-->
 <div class="panel" id="left-panel">
 
   <div>
@@ -515,7 +525,7 @@ select:focus, input[type=date]:focus { border-color: var(--accent); box-shadow: 
     </button>
   </div>
 
-  <!-- Success popup -->
+  <!--Success popup-->
   <div id="success-area"><div id="success-popup"></div></div>
 
   <div style="flex:1;min-height:12px;max-height:32px"></div>
@@ -542,7 +552,7 @@ select:focus, input[type=date]:focus { border-color: var(--accent); box-shadow: 
 
 </div>
 
-<!-- ── CENTER ── -->
+<!--CENTER-->
 <div id="center">
   <div id="video-area">
     <img id="video-feed" alt="live">
@@ -562,7 +572,7 @@ select:focus, input[type=date]:focus { border-color: var(--accent); box-shadow: 
   </div>
 </div>
 
-<!-- ── RIGHT PANEL ── -->
+<!--RIGHT PANEL-->
 <div class="panel" id="right-panel">
 
   <div>
@@ -593,10 +603,10 @@ select:focus, input[type=date]:focus { border-color: var(--accent); box-shadow: 
   </div>
 
 </div>
-</div><!-- /app -->
+</div><!--/app-->
 
 
-<!-- MODAL: SETTING -->
+<!--MODAL: SETTING-->
 <div class="modal fade" id="mSetting" tabindex="-1">
   <div class="modal-dialog modal-dialog-centered" style="max-width:420px">
     <div class="modal-content">
@@ -634,7 +644,7 @@ select:focus, input[type=date]:focus { border-color: var(--accent); box-shadow: 
 </div>
 
 
-<!-- MODAL: EXPORT -->
+<!--MODAL: EXPORT-->
 <div class="modal fade" id="mExport" tabindex="-1">
   <div class="modal-dialog modal-dialog-centered" style="max-width:460px">
     <div class="modal-content">
@@ -702,7 +712,7 @@ select:focus, input[type=date]:focus { border-color: var(--accent); box-shadow: 
   </div>
 </div>
 
-<!-- CUSTOM CONFIRM DIALOG -->
+<!--CUSTOM CONFIRM DIALOG-->
 <div id="confirm-overlay">
   <div id="confirm-box">
     <div id="confirm-icon"><i class="bi bi-trash3-fill"></i></div>
@@ -719,14 +729,14 @@ select:focus, input[type=date]:focus { border-color: var(--accent); box-shadow: 
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.2/js/bootstrap.bundle.min.js"></script>
 <script>
-/* ── State ─────────────────────────────────── */
+/* State */
 const S = {
   preset:'JIS', label:'', running:false,
   jis:[], din:[], months:[],
   records:[], sel:new Set(), xrange:'Today',
 };
 
-/* ── Socket ────────────────────────────────── */
+/* Socket */
 const io_socket = io();
 io_socket.on('init_data', d => {
   S.running=d.running||false; S.preset=d.preset||'JIS'; S.label=d.label||'';
@@ -761,7 +771,7 @@ io_socket.on('export_done', d => {
   else toast('Export Gagal',d.msg||'Kesalahan.','danger');
 });
 
-/* ── Init ──────────────────────────────────── */
+/* Init */
 async function init(){
   startClock();
   // Default: Light Mode. Dark hanya aktif jika user sebelumnya memilih dark.
@@ -783,7 +793,7 @@ async function init(){
   await refreshData();
 }
 
-/* ── Clock & DateTime ──────────────────────── */
+/* Clock & DateTime */
 const DN=['Minggu','Senin','Selasa','Rabu','Kamis','Jumat','Sabtu'];
 const MN=['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
 function startClock(){
@@ -795,14 +805,14 @@ function startClock(){
   t(); setInterval(t,1000);
 }
 
-/* ── Dark/Light Theme ──────────────────────── */
+/* Dark/Light Theme */
 function toggleTheme(){
   const isDark=document.documentElement.classList.toggle('dark');
   el('theme-icon').className = isDark ? 'bi bi-sun-fill' : 'bi bi-moon-fill';
   localStorage.setItem('theme', isDark ? 'dark' : 'light');
 }
 
-/* ── Camera ────────────────────────────────── */
+/* Camera */
 async function loadCams(){
   const s=el('s-cam'); s.innerHTML='';
   // Coba dapatkan nama device asli dari browser
@@ -828,11 +838,23 @@ async function loadCams(){
 async function toggleCamera(){ S.running?await stopCam():await startCam(); }
 async function startCam(){
   if(!validLabel(S.label,S.preset)){ toast('Perhatian','Pilih label terlebih dahulu.','warning'); return; }
-  const r=await (await fetch('/api/camera/start',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({
-    preset:S.preset,label:S.label,camera_index:parseInt(el('s-cam').value)||0,
-    edge_mode:el('chk-edge').checked,split_mode:el('chk-split').checked
-  })})).json();
-  if(!r.ok){ toast('Error',r.msg,'danger'); return; }
+  // Tampilkan loading di button
+  const b=el('btn-start');
+  b.className='btn btn-loading-state';
+  b.innerHTML='<span class="btn-loader"></span> Membuka Kamera...';
+  b.disabled=true;
+  let r;
+  try {
+    r=await (await fetch('/api/camera/start',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({
+      preset:S.preset,label:S.label,camera_index:parseInt(el('s-cam').value)||0,
+      edge_mode:el('chk-edge').checked,split_mode:el('chk-split').checked
+    })})).json();
+  } catch(e){
+    toast('Error','Gagal menghubungi server.','danger');
+    b.disabled=false; syncStartBtn(); return;
+  }
+  b.disabled=false;
+  if(!r.ok){ toast('Error',r.msg,'danger'); syncStartBtn(); return; }
   hide(el('scan-preview')); hide(el('result-badge'));
   S.running=true; syncStartBtn(); lockSetting(true); showOverlay();
 }
@@ -842,6 +864,7 @@ async function stopCam(){
 }
 function syncStartBtn(){
   const b=el('btn-start');
+  b.disabled=false;
   if(S.running){ b.className='btn btn-stop-state'; b.innerHTML='<i class="bi bi-stop-fill"></i> Stop'; }
   else { b.className='btn btn-success-state'; b.innerHTML='<i class="bi bi-play-fill"></i> Start'; }
 }
@@ -856,7 +879,7 @@ async function onOptionChange(){
   await fetch('/api/camera/settings',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({preset:S.preset,label:S.label,edge_mode:el('chk-edge').checked,split_mode:el('chk-split').checked})});
 }
 
-/* ── Scan File ─────────────────────────────── */
+/* Scan File */
 function clickScanFile(){
   if(!validLabel(S.label,S.preset)){ toast('Perhatian','Pilih label terlebih dahulu.','warning'); return; }
   if(S.running){ toast('Info','Stop kamera terlebih dahulu.','info'); return; }
@@ -885,7 +908,7 @@ async function doScan(file){
 }
 function resetScanBtn(){ const b=el('btn-scan'); b.innerHTML='<i class="bi bi-image"></i> Scan from File'; b.disabled=false; }
 
-/* ── Result Badge ──────────────────────────── */
+/* Result Badge */
 let _badgeTimer = null;
 function showBadge(code,status,color){
   const b=el('result-badge'), c=el('result-code'), s=el('result-status');
@@ -897,14 +920,14 @@ function showBadge(code,status,color){
   }
 }
 
-/* ── OCR ────────────────────────────────────── */
+/* OCR */
 function renderOcr(texts){
   const box=el('ocr-box'); box.innerHTML='';
   if(!texts.length){ box.innerHTML='<div class="ocr-item" style="color:var(--text-3)">Menunggu deteksi…</div>'; return; }
   texts.forEach(t=>{ const d=document.createElement('div'); d.className='ocr-item'; d.textContent=t; box.appendChild(d); });
 }
 
-/* ── Table ──────────────────────────────────── */
+/* Table */
 function renderTable(records){
   S.records=records||[]; S.sel.clear();
   const tbody=el('code-tbody'), cnt=el('data-count');
@@ -948,7 +971,7 @@ async function clearSelected(){
   if(d.ok){ toast('Sukses',`${S.sel.size} data dihapus.`,'success'); await refreshData(); } else toast('Error',d.msg,'danger');
 }
 
-/* ── Custom Confirm ─────────────────────────── */
+/* Custom Confirm */
 let _confirmResolve = null;
 function showConfirm(msg){
   el('confirm-msg').innerHTML = msg;
@@ -960,12 +983,12 @@ function closeConfirm(result){
   if(_confirmResolve){ _confirmResolve(result); _confirmResolve=null; }
 }
 
-/* ── Success popup ─────────────────────────── */
+/* Success popup */
 let _st;
 function showSuccess(m){ const p=el('success-popup'); p.innerHTML=m.replace(/\n/g,'<br>'); show(p); clearTimeout(_st); _st=setTimeout(hideSuccess,3500); }
 function hideSuccess(){ hide(el('success-popup')); }
 
-/* ── Setting modal ─────────────────────────── */
+/* Setting modal */
 function openSetting(){
   if(S.running){ toast('Perhatian','Stop kamera sebelum membuka Setting.','warning'); return; }
   el('s-preset').value=S.preset; syncSettingLabel();
@@ -987,7 +1010,7 @@ async function saveSetting(){
   bootstrap.Modal.getInstance(el('mSetting'))?.hide();
 }
 
-/* ── Export modal ──────────────────────────── */
+/* Export modal */
 function openExport(){
   el('x-preset').value=S.preset; populateXLabel();
   const t=new Date().toISOString().split('T')[0]; el('x-start').value=t; el('x-end').value=t;
@@ -1036,7 +1059,7 @@ async function doExport(){
   if(!r.ok){ toast('Error',r.msg,'danger'); b.disabled=false; b.innerHTML='<i class="bi bi-download"></i> Export'; el('x-prog-wrap').style.display='none'; }
 }
 
-/* ── Toast ──────────────────────────────────── */
+/* Toast */
 function toast(title,msg,type){
   const c=el('toast-ct'), id='t'+Date.now();
   const ico={success:'bi-check-circle-fill',danger:'bi-x-circle-fill',warning:'bi-exclamation-triangle-fill',info:'bi-info-circle-fill'};
@@ -1045,14 +1068,14 @@ function toast(title,msg,type){
   c.appendChild(d); setTimeout(()=>{ const e=document.getElementById(id); if(e) e.remove(); },5000);
 }
 
-/* ── Helpers ────────────────────────────────── */
+/* Helpers */
 const el = id => document.getElementById(id);
 const show = e => { if(typeof e==='string') el(e).style.display='block'; else e.style.display='block'; };
 const showEl = id => el(id).style.display='flex';
 const hide = e => { if(typeof e==='string') el(e).style.display='none'; else e.style.display='none'; };
 function dlFile(url,name){ const a=document.createElement('a'); a.href=url; a.download=name; document.body.appendChild(a); a.click(); a.remove(); }
 
-/* ── Searchable Select ──────────────────────── */
+/* Searchable Select */
 const _ssData = {}; // wrapId -> [{value,label,disabled}]
 
 function ssPopulate(wrapId, hiddenId, options){

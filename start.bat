@@ -1,7 +1,7 @@
 @echo off
 title QC Battery Inspection Cardboard
 
-set PROJECT_DIR=C:\Users\ACER NITRO\OneDrive\Desktop\OCR_JS\ocrweb_capt
+set PROJECT_DIR=C:\Users\sigitf\Documents\Project_Inspeksi\good_ocr\web_ocr_capt
 
 :: set FLAG_FILE=.installed
 
