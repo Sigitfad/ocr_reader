@@ -11,50 +11,47 @@ from datetime import datetime, date  #untuk mengambil tanggal dan waktu saat ini
 from flask import Flask, render_template, request, jsonify, send_file, Response  #komponen utama Flask web framework
 from flask_socketio import SocketIO, emit  #webSocket untuk komunikasi real-time ke browser
 
+
 #menentukan direktori tempat file ini berada dan menambahkannya ke sys.path
 #agar modul lokal (config, database, dll.) bisa di-import tanpa error
 THIS_DIR = os.path.dirname(os.path.abspath(__file__))
 if THIS_DIR not in sys.path:
     sys.path.insert(0, THIS_DIR)
 
-#import konstanta konfigurasi aplikasi dari file config.py
+#import konfigurasi aplikasi dari file config.py
 from config import (
     APP_NAME, JIS_TYPES, DIN_TYPES, MONTHS, MONTH_MAP,
     PATTERNS, DB_FILE, IMAGE_DIR, EXCEL_DIR
 )
 #setup, baca data, hapus, dan simpan deteksi
 from database import setup_database, load_existing_data, delete_codes, insert_detection
-from export import execute_export #untuk mengekspor data ke file Excel
+from export import execute_export #untuk mengekspor data ke file excel
 from utils import create_directories, get_available_cameras #membuat folder dan mendeteksi kamera yang tersedia
 
-#inisialisasi aplikasi Flask
+#inisialisasi aplikasi flask
 app = Flask(__name__)
-app.config['SECRET_KEY'] = 'qc_gs_battery_secret_2024'  #kunci rahasia untuk keamanan sesi Flask
+app.config['SECRET_KEY'] = 'qc_gs_battery_secret_2024' #kunci rahasia untuk keamanan flask
 #inisialisasi SocketIO dengan mode threading agar tidak blocking
 socketio = SocketIO(app, cors_allowed_origins="*", async_mode='threading')
 
 #kelas untuk menyimpan state/kondisi aplikasi secara global
 class AppState:
     def __init__(self):
-        self.logic = None             #objek DetectionLogic (OCR + kamera)
-        self.is_running = False       #status apakah kamera sedang aktif
-        self.preset = "JIS"           #preset standar deteksi (JIS atau DIN)
-        self.target_label = ""        #label target sesi yang sedang dipantau
-        self.camera_index = 0         #index kamera yang digunakan
-        self.edge_mode = False        #mode deteksi tepi (edge detection)
-        self.split_mode = False       #mode split frame (gambar dibagi dua)
-        self.available_cameras = []   #daftar kamera yang terdeteksi
-        self.last_frame_b64 = None    #frame terakhir dalam format base64
-        self.stream_lock = threading.Lock()  #lock untuk akses thread-safe ke frame
-        self.export_in_progress = False #status apakah proses export sedang berjalan
+        self.logic = None           #objek DetectionLogic (ocr + kamera)
+        self.is_running = False     #status apakah kamera sedang aktif
+        self.preset = "JIS"         #preset standar deteksi (JIS atau DIN)
+        self.target_label = ""      #label target sesi yang sedang dipantau
+        self.camera_index = 0       #index kamera yang digunakan
+        self.edge_mode = False      #mode deteksi tepi (edge detection)
+        self.split_mode = False     #mode split frame (gambar dibagi dua)
+        self.available_cameras = [] #daftar kamera yang terdeteksi
+        self.last_frame_b64 = None  #frame terakhir dalam format base64
+        self.stream_lock = threading.Lock() #lock untuk akses thread-safe ke frame
+        self.export_in_progress = False     #status apakah proses export sedang berjalan
 
-#buat satu instance state global yang dipakai seluruh aplikasi
-state = AppState()
-
-#buat direktori yang diperlukan (images, excel, dll.) jika belum ada
-create_directories()
-#inisialisasi database (buat tabel jika belum ada)
-setup_database()
+state = AppState()      #buat satu instance state global yang dipakai seluruh aplikasi
+create_directories()    #buat direktori yang diperlukan (images, excel, dll.) jika belum ada
+setup_database()        #inisialisasi database (buat tabel jika belum ada)
 
 #fungsi untuk menginisialisasi logika deteksi ocr beserta semua callback-nya
 def _init_detection_logic():
@@ -64,10 +61,10 @@ def _init_detection_logic():
     #kelas pengganti sinyal Qt/PyQt agar kompatibel dengan Flask (tanpa GUI)
     class FakeSignal:
         def __init__(self, callback):
-            self._cb = callback  #simpan fungsi callback yang akan dipanggil
+            self._cb = callback #simpan fungsi callback yang akan dipanggil
         def emit(self, *args):
             try:
-                self._cb(*args)  #panggil callback saat sinyal di-emit
+                self._cb(*args) #panggil callback saat sinyal di-emit
             except Exception as e:
                 print(f"[signal emit error] {e}")
 
@@ -76,14 +73,14 @@ def _init_detection_logic():
         try:
             buf = io.BytesIO()
             pil_image.save(buf, format='JPEG', quality=75)  #kompres frame ke jpeg
-            b64 = base64.b64encode(buf.getvalue()).decode('utf-8')  #encode ke base64
+            b64 = base64.b64encode(buf.getvalue()).decode('utf-8')   #encode ke base64
             with state.stream_lock:
                 state.last_frame_b64 = b64  #simpan frame terakhir
-            socketio.emit('frame', {'img': b64})  #kirim frame ke browser via WebSocket
+            socketio.emit('frame', {'img': b64})    #kirim frame ke browser via WebSocket
         except Exception as e:
             print(f"[frame error] {e}")
 
-    #callback: dipanggil saat kode berhasil terdeteksi oleh OCR
+    #callback: dipanggil saat kode berhasil terdeteksi oleh ocr 
     def on_code_detected(message):
         today = datetime.now().date()
         records = load_existing_data(today)  #ambil semua data hari ini dari database
@@ -131,23 +128,21 @@ def _serialize_records(records):
     return result
 
 
-#route halaman utama untuk menampilkan template HTML dashboard
+#route halaman utama untuk menampilkan template .html dashboard
 @app.route('/')
 def index():
     return render_template('index.html', app_name=APP_NAME)
 
-
 #API : mendapatkan daftar kamera yang tersedia di sistem
 @app.route('/api/cameras', methods=['GET'])
 def api_get_cameras():
-    """Dapatkan list kamera yang tersedia."""
-    from config import MAX_CAMERAS  #ambil batas maksimal kamera dari config
-    cameras = get_available_cameras(MAX_CAMERAS)  #deteksi kamera yang bisa digunakan
+    #dapatkan list kamera yang tersedia
+    from config import MAX_CAMERAS #ambil batas maksimal kamera dari config
+    cameras = get_available_cameras(MAX_CAMERAS) #deteksi kamera yang bisa digunakan
     state.available_cameras = cameras
     return jsonify({
         'cameras': [{'index': c['index'], 'name': c['name']} for c in cameras]
     })
-
 
 #API: memulai kamera dan proses deteksi ocr
 @app.route('/api/camera/start', methods=['POST'])
@@ -170,12 +165,11 @@ def api_camera_start():
     state.logic.current_camera_index = state.camera_index
     state.logic.edge_mode           = state.edge_mode
     state.logic.split_mode          = state.split_mode
-    state.logic.daemon              = True  #jalankan sebagai daemon thread
+    state.logic.daemon              = True #jalankan sebagai daemon thread
 
     state.is_running = True
-    state.logic.start_detection()  #mulai loop deteksi kamera
+    state.logic.start_detection()   #mulai loop deteksi kamera
     return jsonify({'ok': True, 'msg': 'Kamera dimulai'})
-
 
 #API: menghentikan kamera dan proses deteksi
 @app.route('/api/camera/stop', methods=['POST'])
@@ -183,11 +177,10 @@ def api_camera_stop():
     if not state.is_running:
         return jsonify({'ok': False, 'msg': 'Kamera tidak sedang berjalan'})
     if state.logic:
-        state.logic.stop_detection()  #hentikan loop deteksi
+        state.logic.stop_detection() #hentikan loop deteksi
     state.is_running = False
-    state.logic = None  #hapus referensi agar memori bisa dibebaskan
+    state.logic = None #hapus referensi agar memori bisa dibebaskan
     return jsonify({'ok': True, 'msg': 'Kamera dihentikan'})
-
 
 #API: mengubah pengaturan deteksi saat kamera sedang berjalan
 @app.route('/api/camera/settings', methods=['POST'])
@@ -209,7 +202,6 @@ def api_camera_settings():
 
     return jsonify({'ok': True})
 
-
 #API: memindai gambar dari file yang diupload (tanpa kamera live)
 @app.route('/api/scan/file', methods=['POST'])
 def api_scan_file():
@@ -224,7 +216,7 @@ def api_scan_file():
     if not file.filename:
         return jsonify({'ok': False, 'msg': 'Nama file kosong'})
 
-    import tempfile  #untuk membuat file sementara di disk
+    import tempfile #untuk membuat file sementara di disk
     ext = os.path.splitext(file.filename)[1].lower()
     #validasi ekstensi file yang didukung
     if ext not in ['.jpg', '.jpeg', '.png', '.bmp', '.webp']:
@@ -243,15 +235,14 @@ def api_scan_file():
         state.logic.edge_mode    = state.edge_mode
         state.logic.split_mode   = state.split_mode
 
-    result = state.logic.scan_file(tmp_path)  #jalankan ocr pada file gambar
+    result = state.logic.scan_file(tmp_path)    #jalankan ocr pada file gambar
 
     try:
-        os.remove(tmp_path)  #hapus file sementara setelah selesai diproses
+        os.remove(tmp_path)     #hapus file sementara setelah selesai diproses
     except:
         pass
 
     return jsonify({'ok': True, 'status': result})
-
 
 #API: mengambil semua data deteksi hari ini dari database
 @app.route('/api/data/today', methods=['GET'])
@@ -259,7 +250,6 @@ def api_data_today():
     today = datetime.now().date()
     records = load_existing_data(today)
     return jsonify({'records': _serialize_records(records)})
-
 
 #API: menghapus record berdasarkan daftar id yang dikirim
 @app.route('/api/data/delete', methods=['POST'])
@@ -282,7 +272,6 @@ def api_data_delete():
     else:
         return jsonify({'ok': False, 'msg': 'Gagal menghapus record'})
 
-
 #API: mengambil statistik ringkasan data hari ini (total, OK, Not OK)
 @app.route('/api/data/stats', methods=['GET'])
 def api_data_stats():
@@ -293,7 +282,6 @@ def api_data_stats():
     not_ok = sum(1 for r in records if r.get('Status') == 'Not OK')
     return jsonify({'total': total, 'ok': ok, 'not_ok': not_ok})
 
-
 #API: melayani file gambar hasil deteksi berdasarkan nama file
 @app.route('/api/image/<path:filename>')
 def api_serve_image(filename):
@@ -301,7 +289,6 @@ def api_serve_image(filename):
     if os.path.exists(img_path):
         return send_file(img_path, mimetype='image/jpeg')
     return jsonify({'error': 'Image not found'}), 404
-
 
 #API: memulai proses export data ke file excel (dijalankan di background thread)
 @app.route('/api/export', methods=['POST'])
@@ -319,14 +306,14 @@ def api_export():
     start_date    = data.get('start_date', '')
     end_date      = data.get('end_date', '')
 
-    conditions = []  #list kondisi WHERE untuk query SQL
+    conditions = [] #list kondisi WHERE untuk query sql
 
     #bangun kondisi filter berdasarkan rentang tanggal yang dipilih
     if date_range == 'Today':
         today_str = datetime.now().strftime('%Y-%m-%d')
         conditions.append(f"timestamp LIKE '{today_str}%'")
     elif date_range == 'Month' and month_name:
-        month_num = MONTH_MAP.get(month_name, datetime.now().month)  #konversi nama bulan ke angka
+        month_num = MONTH_MAP.get(month_name, datetime.now().month) #konversi nama bulan ke angka
         month_str = f"{year_val}-{month_num:02d}"
         conditions.append(f"timestamp LIKE '{month_str}%'")
     elif date_range == 'CustomDate' and start_date and end_date:
@@ -335,17 +322,17 @@ def api_export():
     #tentukan preset aktual yang digunakan untuk filter
     actual_preset = preset_filter
     if preset_filter == 'Preset':
-        actual_preset = state.preset  #gunakan preset saat ini jika tidak dispesifikasi
+        actual_preset = state.preset    #gunakan preset saat ini jika tidak dispesifikasi
 
     if actual_preset in ['JIS', 'DIN']:
         conditions.append(f"preset = '{actual_preset}'")
 
     #filter berdasarkan label target jika bukan "All Label"
     if label_filter and label_filter not in ['All Label', 'Preset']:
-        safe_label = label_filter.replace("'", "''")  #escape tanda kutip untuk keamanan SQL
+        safe_label = label_filter.replace("'", "''")    #escape tanda kutip untuk keamanan sql
         conditions.append(f"target_session = '{safe_label}'")
 
-    #gabungkan semua kondisi menjadi klausa WHERE SQL
+    #gabungkan semua kondisi menjadi klausa WHERE sql
     sql_filter = ("WHERE " + " AND ".join(conditions)) if conditions else ""
 
     #buat deskripsi rentang tanggal untuk nama file export
@@ -355,7 +342,8 @@ def api_export():
     elif date_range == 'CustomDate':
         date_range_desc = f"{start_date}_to_{end_date}"
 
-    state.export_in_progress = True  #tandai export sedang berjalan
+    state.export_in_progress = True #tandai export sedang berjalan
+
 
     #fungsi yang dijalankan di thread terpisah agar tidak memblokir server
     def do_export():
@@ -370,15 +358,22 @@ def api_export():
                     'export_progress', {'current': cur, 'total': tot, 'msg': msg}
                 )
             )
-            socketio.emit('export_done', {'ok': True, 'path': result})  #beritahu browser export selesai
+            if result == "NO_DATA": #cek jika hasil export kosong, kirim notifikasi 'no_data' ke client
+                socketio.emit('export_done', {'ok': False, 'no_data': True, 'msg': 'Gagal Export, Tidak ada data !'})
+            elif result and result.startswith("EXPORT_ERROR:"): #jika ada pesan error spesifik dari proses export
+                socketio.emit('export_done', {'ok': False, 'msg': result.replace("EXPORT_ERROR: ", "")})
+            #jika berhasil, kirim path file hasil export ke client
+            else:
+                socketio.emit('export_done', {'ok': True, 'path': result})
+        #tangkap error sistem yang tidak terduga dan kirim pesan errornya
         except Exception as e:
             socketio.emit('export_done', {'ok': False, 'msg': str(e)})
+        #pastikan status 'in_progress' diubah kembali ke False setelah proses selesai/gagal
         finally:
-            state.export_in_progress = False  #reset flag setelah selesai atau error
+            state.export_in_progress = False
 
-    threading.Thread(target=do_export, daemon=True).start()  #jalankan export di background
-    return jsonify({'ok': True, 'msg': 'Export dimulai'})
-
+    threading.Thread(target=do_export, daemon=True).start()
+    return jsonify({'ok': True, 'msg': 'Export dimulai'}) #berikan respon cepat ke client bahwa proses export sudah mulai berjalan
 
 #API: mengunduh file Excel hasil export berdasarkan nama file
 @app.route('/api/export/download/<path:filename>')
@@ -387,14 +382,13 @@ def api_export_download(filename):
     if os.path.exists(filepath):
         return send_file(
             filepath,
-            as_attachment=True,      #paksa browser untuk download (bukan tampilkan)
+            as_attachment=True, #paksa browser untuk download (bukan tampilkan) 
             download_name=filename,
             mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
         )
     return jsonify({'error': 'File not found'}), 404
 
-
-#API: mengambil daftar label JIS, DIN, dan nama bulan untuk keperluan dropdown UI
+#API: mengambil daftar label JIS, DIN, dan nama bulan untuk keperluan dropdown ui
 @app.route('/api/labels', methods=['GET'])
 def api_labels():
     return jsonify({
@@ -402,7 +396,6 @@ def api_labels():
         'din': DIN_TYPES,
         'months': MONTHS,
     })
-
 
 #API: mengambil kondisi/state aplikasi saat ini
 @app.route('/api/state', methods=['GET'])
@@ -415,7 +408,6 @@ def api_state():
         'edge_mode':     state.edge_mode,
         'split_mode':    state.split_mode,
     })
-
 
 #event SocketIO: saat client (browser) terhubung, kirim data awal
 @socketio.on('connect')
@@ -436,11 +428,10 @@ def on_connect():
 def on_disconnect():
     pass
 
-
 #entry point: jalankan server Flask-SocketIO saat file dieksekusi langsung
 if __name__ == '__main__':
     print("=" * 55)
-    print(f"  {APP_NAME} — Web Dashboard")
+    print(f"  {APP_NAME} — KartonOCR")
     print("=" * 55)
     print("  Buka browser dan akses: http://localhost:5000")
     print("  Tekan Ctrl+C untuk menghentikan server")

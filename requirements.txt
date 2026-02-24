@@ -1,18 +1,10 @@
-#web framework
 flask>=3.1.2
 flask-socketio>=5.3.6
-
-#computer vision & OCR
-opencv-python>=4.13.0
+opencv-python>=4.8.0
 easyocr>=1.7.0
-
-#image processing
-pillow>=12.1.1
-
-#data & export
-numpy>=2.4.2
-pandas>=3.0.1
-openpyxl>=3.1.5
-xlsxwriter>=3.2.9
-
-PySide6>=6.7.0
+pillow>=10.0.0
+numpy>=1.24.0,<2.3.0
+pandas>=2.0.0
+openpyxl>=3.1.0
+xlsxwriter>=3.1.0
+pyinstaller

@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="id">
 <head>
+  <link rel="icon" type="image/x-icon" href="/static/logo_gs.ico">
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Inspeksi Karton</title>
@@ -531,7 +532,7 @@ select:focus, input[type=date]:focus { border-color: var(--accent); box-shadow: 
   <div style="flex:1;min-height:12px;max-height:32px"></div>
 
   <div>
-    <div class="label">OCR Output</div>
+    <div class="label">TEXT OUTPUT</div>
     <div id="ocr-box">
       <div class="ocr-item" style="color:var(--text-3)">Menunggu deteksi…</div>
     </div>
@@ -768,6 +769,7 @@ io_socket.on('export_done', d => {
   el('x-prog-wrap').style.display='none';
   const b=el('btn-export-do'); b.disabled=false; b.innerHTML='<i class="bi bi-download"></i> Export';
   if(d.ok&&d.path){ const fn=d.path.split(/[\\/]/).pop(); dlFile('/api/export/download/'+encodeURIComponent(fn),fn); bootstrap.Modal.getInstance(el('mExport'))?.hide(); toast('Berhasil','Diekspor: '+fn,'success'); }
+  else if(d.no_data){ toast('Export Gagal','Gagal Export, Tidak ada data !','warning'); }
   else toast('Export Gagal',d.msg||'Kesalahan.','danger');
 });
 
