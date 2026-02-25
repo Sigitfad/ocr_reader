@@ -1,6 +1,6 @@
 import os           #operasi file, direktori, dan path untuk manajemen file gambar
 import sys          #operasi sistem dan manipulasi path untuk file dan direktori
-import io           #operasi I/O untuk manipulasi gambar dalam memori (BytesIO)
+import io           #operasi i/o untuk manipulasi gambar dalam memori (BytesIO)
 import re           #regular expression untuk validasi dan parsing teks hasil OCR
 import cv2          #openCV untuk pemrosesan gambar/video dari kamera
 import base64       #encode gambar ke format base64 agar bisa dikirim via SocketIO
@@ -9,7 +9,7 @@ import time         #untuk delay dan pengukuran waktu dalam proses export
 import numpy as np  #operasi array/matriks untuk pemrosesan gambar
 from datetime import datetime, date  #untuk mengambil tanggal dan waktu saat ini
 from flask import Flask, render_template, request, jsonify, send_file, Response  #komponen utama Flask web framework
-from flask_socketio import SocketIO, emit  #webSocket untuk komunikasi real-time ke browser
+from flask_socketio import SocketIO, emit  #websocket untuk komunikasi real-time ke browser
 
 
 #menentukan direktori tempat file ini berada dan menambahkannya ke sys.path
@@ -52,6 +52,38 @@ class AppState:
 state = AppState()      #buat satu instance state global yang dipakai seluruh aplikasi
 create_directories()    #buat direktori yang diperlukan (images, excel, dll.) jika belum ada
 setup_database()        #inisialisasi database (buat tabel jika belum ada)
+
+#--- SINGLETON OCR READER ---
+#Reader di-load SEKALI saat server pertama kali jalan, bukan saat tombol Start ditekan.
+#Ini menghilangkan delay 5-30 detik yang terjadi setiap kali pengguna menekan Start.
+#Reader disimpan di state agar bisa dipakai ulang oleh setiap instance DetectionLogic.
+def _init_ocr_reader():
+    import easyocr, numpy as np
+    try:
+        import torch
+        _gpu = torch.cuda.is_available()
+    except ImportError:
+        _gpu = False
+    print(f"[OCR] Memuat model EasyOCR (GPU={'Ya' if _gpu else 'CPU'})...")
+    reader = easyocr.Reader(['en'], gpu=_gpu, verbose=False)
+    #warm-up: jalankan satu inferensi dummy agar model benar-benar siap
+    try:
+        reader.readtext(np.zeros((32, 128, 3), dtype=np.uint8), detail=0)
+    except Exception:
+        pass
+    print("[OCR] Model siap.")
+    return reader
+
+#Jalankan load model di background thread agar server tidak freeze saat startup
+import threading as _threading
+state.ocr_reader = None
+state.ocr_ready  = threading.Event()  #event untuk sinkronisasi: reader sudah siap
+
+def _ocr_loader_thread():
+    state.ocr_reader = _init_ocr_reader()
+    state.ocr_ready.set()  #tandai reader sudah siap
+
+_threading.Thread(target=_ocr_loader_thread, daemon=True).start()
 
 #fungsi untuk menginisialisasi logika deteksi ocr beserta semua callback-nya
 def _init_detection_logic():
@@ -102,12 +134,14 @@ def _init_detection_logic():
         socketio.emit('ocr_text', {'texts': text_list})
 
     #buat objek DetectionLogic dengan semua sinyal yang sudah dibungkus FakeSignal
+    #reader di-inject dari singleton global agar tidak perlu load ulang setiap Start
     logic = DetectionLogic(
         FakeSignal(on_frame_update),
         FakeSignal(on_code_detected),
         FakeSignal(on_camera_status),
         FakeSignal(on_data_reset),
         FakeSignal(on_all_text),
+        shared_reader=state.ocr_reader,
     )
     return logic
 
@@ -127,6 +161,12 @@ def _serialize_records(records):
         })
     return result
 
+
+#API: cek apakah model OCR sudah siap (digunakan frontend untuk menampilkan status loading)
+@app.route('/api/ocr/ready', methods=['GET'])
+def api_ocr_ready():
+    ready = state.ocr_ready.is_set() if hasattr(state, 'ocr_ready') else False
+    return jsonify({'ready': ready})
 
 #route halaman utama untuk menampilkan template .html dashboard
 @app.route('/')
@@ -157,6 +197,11 @@ def api_camera_start():
     state.camera_index = int(data.get('camera_index', 0))
     state.edge_mode    = bool(data.get('edge_mode', False))
     state.split_mode   = bool(data.get('split_mode', False))
+
+    #tunggu sampai OCR reader benar-benar siap (max 60 detik)
+    #jika model belum selesai dimuat, beri tahu client agar retry
+    if not state.ocr_ready.wait(timeout=60):
+        return jsonify({'ok': False, 'msg': 'Model OCR belum siap, coba lagi sebentar.'})
 
     #inisialisasi logika deteksi dan terapkan semua setting
     state.logic = _init_detection_logic()

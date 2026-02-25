@@ -249,7 +249,7 @@ select:focus, input[type=date]:focus { border-color: var(--accent); box-shadow: 
   background: var(--accent-bg); border: 1px solid #bfdbfe;
 }
 .stat-label-key { font-size: 14px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; color: var(--accent); }
-.stat-label-val { font-family: 'Montserrat', sans-serif; font-size: 23px; font-weight: 700; color: var(--accent); letter-spacing: .5px; }
+.stat-label-val { font-family: 'Montserrat', sans-serif; font-size: 30px; font-weight: 700; color: var(--accent); letter-spacing: .5px; }
 
 .stat-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 10px; }
 .stat-card {
@@ -280,6 +280,62 @@ select:focus, input[type=date]:focus { border-color: var(--accent); box-shadow: 
   font-size: 12px; font-weight: 500; color: rgba(255,255,255,.85);
   display: none; white-space: nowrap; pointer-events: none; z-index: 5;
 }
+
+/* Indikator loading OCR pada tombol Start */
+.ocr-loading-dot {
+  display: inline-block;
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  background: currentColor;
+  margin-right: 4px;
+  vertical-align: middle;
+  animation: ocr-pulse 0.9s infinite ease-in-out;
+}
+@keyframes ocr-pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:0.35;transform:scale(0.7)} }
+
+/* === FLASH & SHUTTER EFFECTS === */
+#flash-overlay {
+  position: absolute; inset: 0; pointer-events: none; z-index: 20;
+  opacity: 0; border-radius: 0;
+}
+@keyframes flash-white {
+  0%   { opacity: 0; }
+  15%  { opacity: 0.82; }
+  40%  { opacity: 0.55; }
+  100% { opacity: 0; }
+}
+@keyframes flash-scan {
+  0%   { opacity: 0; }
+  20%  { opacity: 0.18; }
+  100% { opacity: 0; }
+}
+.do-flash-ok    { background: #ffffff; animation: flash-white 0.45s ease-out forwards; }
+.do-flash-scan  { background: #4fc3f7; animation: flash-scan  0.35s ease-out forwards; }
+
+/* Shutter border — gelap tipis mengelilingi video saat scanning */
+#shutter-border {
+  position: absolute; inset: 0; pointer-events: none; z-index: 19;
+  border: 3px solid transparent; border-radius: 2px;
+  transition: border-color 0.15s ease;
+}
+#shutter-border.active-ok    { border-color: #22c55e; box-shadow: inset 0 0 18px rgba(34,197,94,0.25); }
+
+/* Indikator scanning sudut kiri atas */
+#scan-indicator {
+  position: absolute; top: 50px; left: 12px; z-index: 21;
+  display: none; align-items: center; gap: 6px;
+  background: rgba(0,0,0,0.65); backdrop-filter: blur(6px);
+  padding: 4px 10px 4px 8px; border-radius: 99px;
+  font-size: 11px; font-weight: 600; color: #4fc3f7;
+  letter-spacing: 1px; text-transform: uppercase;
+  pointer-events: none;
+}
+#scan-indicator .dot {
+  width: 7px; height: 7px; border-radius: 50%;
+  background: #4fc3f7;
+  animation: pulse 1.1s infinite;
+}
+@keyframes scan-blink { 0%,100%{opacity:1} 50%{opacity:0.3} }
 
 #result-badge {
   position: absolute; bottom: 16px; left: 50%; transform: translateX(-50%);
@@ -520,7 +576,7 @@ select:focus, input[type=date]:focus { border-color: var(--accent); box-shadow: 
   </div>
 
   <div>
-    <div class="label">Scan</div>
+    <div class="label">FILE</div>
     <button class="btn btn-outline" id="btn-scan" onclick="clickScanFile()">
       <i class="bi bi-image"></i> Scan from File
     </button>
@@ -564,6 +620,10 @@ select:focus, input[type=date]:focus { border-color: var(--accent); box-shadow: 
     </div>
     <div id="scan-overlay"></div>
     <div id="result-badge"><div id="result-code">—</div><div id="result-status">Waiting</div></div>
+    <!-- Flash & shutter visual feedback elements -->
+    <div id="flash-overlay"></div>
+    <div id="shutter-border"></div>
+    <div id="scan-indicator"><span class="dot"></span> Scanning…</div>
     <div id="file-dropzone" onclick="document.getElementById('fhidden').click()" ondragover="onDragOver(event)" ondragleave="onDragLeave(event)" ondrop="onFileDrop(event)">
       <i class="bi bi-cloud-arrow-up" style="font-size:44px"></i>
       <div>Drop image here or click to browse</div>
@@ -746,13 +806,14 @@ io_socket.on('init_data', d => {
 io_socket.on('frame', d => {
   hide('video-ph'); hide('scan-preview');
   const f=el('video-feed'); f.src='data:image/jpeg;base64,'+d.img; show(f);
+  triggerScanFlash();
 });
 io_socket.on('code_detected', d => {
   const msg=d.message||'', recs=d.records||[];
   resetScanBtn();
   if(msg==='FAILED') { toast('Gagal','Tidak ada label terdeteksi.','danger'); showBadge('—','FAILED','red'); }
   else if(msg.startsWith('ERROR:')) { toast('Error',msg.slice(6),'danger'); showBadge('ERR','Error','red'); }
-  else { showSuccess('Scan Berhasil!\n'+msg); showBadge(msg,'DETECTED','green'); }
+  else { showSuccess('Scan Berhasil!\n'+msg); showBadge(msg,'DETECTED','green'); triggerFlash('ok'); }
   renderTable(recs);
 });
 io_socket.on('camera_status', d => {
@@ -793,7 +854,76 @@ async function init(){
   S.preset=sd.preset||'JIS'; S.label=sd.target_label||'';
   el('s-preset').value=S.preset; syncSettingLabel();
   await refreshData();
+
+  //--- CEK STATUS OCR MODEL ---
+  //Model EasyOCR dimuat di background saat server start.
+  //Polling setiap 1.5 detik sampai siap, lalu update tombol Start.
+  pollOcrReady();
 }
+
+//Polling status OCR: disable tombol Start + tampilkan status sampai model siap
+async function pollOcrReady(){
+  const b = el('btn-start');
+  let ready = false;
+  try {
+    const r = await (await fetch('/api/ocr/ready')).json();
+    ready = r.ready || false;
+  } catch(e) { ready = false; }
+
+  if(!ready && !S.running){
+    b.disabled = true;
+    b.className = 'btn btn-success-state';
+    b.innerHTML = '<span class="ocr-loading-dot"></span> Memuat OCR…';
+    setTimeout(pollOcrReady, 1500);
+  } else {
+    if(!S.running){ b.disabled = false; syncStartBtn(); }
+  }
+}
+
+/* ===== FLASH & SHUTTER VISUAL FEEDBACK ===== */
+// Variabel untuk throttle scan flash (agar tidak terlalu sering tiap frame)
+let _lastScanFlash = 0;
+let _scanFlashTimer = null;
+
+// Flash saat deteksi berhasil (ok)
+function triggerFlash(type) {
+  const overlay = el('flash-overlay');
+  const border  = el('shutter-border');
+  if (!overlay) return;
+
+  // Hapus class lama dan paksa reflow agar animasi ulang
+  overlay.className = '';
+  border.className  = '';
+  void overlay.offsetWidth;
+
+  // Hanya flash putih untuk deteksi berhasil
+  overlay.classList.add('do-flash-ok');
+  border.classList.add('active-ok');
+  setTimeout(() => { border.className = ''; }, 900);
+}
+
+// Flash tipis biru setiap beberapa frame sebagai tanda kamera aktif scanning
+function triggerScanFlash() {
+  const now = Date.now();
+  // Batasi efek scan flash maksimal 1x tiap 2 detik agar tidak mengganggu
+  if (now - _lastScanFlash < 2000) return;
+  _lastScanFlash = now;
+
+  const overlay = el('flash-overlay');
+  if (!overlay || overlay.classList.contains('do-flash-ok') || overlay.classList.contains('do-flash-notok')) return;
+  overlay.className = '';
+  void overlay.offsetWidth;
+  overlay.classList.add('do-flash-scan');
+  setTimeout(() => { if(overlay.classList.contains('do-flash-scan')) overlay.className=''; }, 400);
+}
+
+// Tampilkan / sembunyikan indikator "Scanning…" di pojok video
+function setScanIndicator(visible) {
+  const ind = el('scan-indicator');
+  if (!ind) return;
+  ind.style.display = visible ? 'flex' : 'none';
+}
+/* ===== END FLASH & SHUTTER ===== */
 
 /* Clock & DateTime */
 const DN=['Minggu','Senin','Selasa','Rabu','Kamis','Jumat','Sabtu'];
@@ -858,11 +988,11 @@ async function startCam(){
   b.disabled=false;
   if(!r.ok){ toast('Error',r.msg,'danger'); syncStartBtn(); return; }
   hide(el('scan-preview')); hide(el('result-badge'));
-  S.running=true; syncStartBtn(); lockSetting(true); showOverlay();
+  S.running=true; syncStartBtn(); lockSetting(true); showOverlay(); setScanIndicator(true);
 }
 async function stopCam(){
   await fetch('/api/camera/stop',{method:'POST'});
-  S.running=false; syncStartBtn(); lockSetting(false); hideSuccess();
+  S.running=false; syncStartBtn(); lockSetting(false); hideSuccess(); setScanIndicator(false);
 }
 function syncStartBtn(){
   const b=el('btn-start');

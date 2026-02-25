@@ -2,7 +2,7 @@ import os  #operasi file, direktori, dan path untuk manajemen file gambar
 from PIL import Image  #PIL digunakan untuk mendeteksi versi resampling yang tersedia
 
 #informasi Aplikasi
-APP_NAME = "QC_GS-Battery" #nama aplikasi yang ditampilkan di UI
+APP_NAME = "QC" #nama aplikasi yang ditampilkan di ui
 APP_VERSION = "1.0.0"      #versi aplikasi
 
 #ukuran Jendela Aplikasi (GUI)
@@ -22,7 +22,7 @@ CAMERA_HEIGHT = 720   #resolusi tinggi frame dari kamera (px)
 TARGET_WIDTH = 640    #lebar gambar setelah di-resize untuk OCR (px)
 TARGET_HEIGHT = 640   #tinggi gambar setelah di-resize untuk OCR (px)
 BUFFER_SIZE = 1       #jumlah frame yang di-buffer (1 = tanpa buffer berlebih)
-SCAN_INTERVAL = 2.0   #jeda antar scan ocr dalam detik
+SCAN_INTERVAL = 1.0   #jeda antar scan ocr dalam detik (dipercepat dari 2.0)
 MAX_CAMERAS = 5       #maksimal kamera yang dicoba saat deteksi otomatis
 
 #kompatibilitas resampling PIL

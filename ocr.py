@@ -26,7 +26,7 @@ from database import ( #mengimpor fungsi-fungsi untuk mengelola database dari fi
 #mewarisi threading.Thread agar bisa berjalan paralel dengan UI/server
 class DetectionLogic(threading.Thread):
 
-    def __init__(self, update_signal, code_detected_signal, camera_status_signal, data_reset_signal, all_text_signal=None):
+    def __init__(self, update_signal, code_detected_signal, camera_status_signal, data_reset_signal, all_text_signal=None, shared_reader=None):
         super().__init__()
         #sinyal-sinyal untuk berkomunikasi dengan ui/frontend (menggunakan FakeSignal di mode web)
         self.update_signal = update_signal               #kirim frame terbaru ke ui
@@ -59,13 +59,18 @@ class DetectionLogic(threading.Thread):
         setup_database()  #inisialisasi database jika belum ada
         self.detected_codes = load_existing_data(self.current_date)  #muat data deteksi hari ini
 
-        #cek apakah GPU tersedia untuk easyocr (lebih cepat jika ada GPU)
-        try:
-            import torch
-            _gpu_available = torch.cuda.is_available()
-        except ImportError:
-            _gpu_available = False  #tidak ada torch -> gunakan CPU
-        self.reader = easyocr.Reader(['en'], gpu=_gpu_available, verbose=False)
+        #--- OCR READER ---
+        #Jika shared_reader diberikan (mode web/Flask), gunakan langsung tanpa load ulang.
+        #Jika tidak ada (mode desktop standalone), load sendiri seperti biasa.
+        if shared_reader is not None:
+            self.reader = shared_reader
+        else:
+            try:
+                import torch
+                _gpu_available = torch.cuda.is_available()
+            except ImportError:
+                _gpu_available = False
+            self.reader = easyocr.Reader(['en'], gpu=_gpu_available, verbose=False)
 
         #CLAHE: metode peningkatan kontras lokal untuk membantu ocr di kondisi cahaya buruk
         self._clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
@@ -673,27 +678,26 @@ class DetectionLogic(threading.Thread):
         try:
             h, w = frame.shape[:2]
             scale_factor = 1.0
-            #downscale frame ke lebar 640px agar ocr lebih cepat (jika frame lebih besar)
-            if w > 640:
-                scale_factor = 640 / w
-                new_w, new_h = 640, int(h * scale_factor)
+            #downscale frame ke lebar 480px untuk OCR — lebih kecil = lebih cepat,
+            #masih cukup resolusi untuk membaca kode baterai yang tercetak besar
+            if w > 480:
+                scale_factor = 480 / w
+                new_w, new_h = 480, int(h * scale_factor)
                 frame_small = cv2.resize(frame, (new_w, new_h), interpolation=cv2.INTER_AREA)
             else:
                 frame_small = frame
 
             gray = cv2.cvtColor(frame_small, cv2.COLOR_BGR2GRAY)
-            processing_stages = {}
 
-            #kernel untuk penajaman gambar (sharpening): menonjolkan tepi dan detail
-            kernel_sharpen = np.array([[-1,-1,-1], [-1, 9,-1],[-1,-1,-1]])
-
-            #siapkan beberapa tahap preprocessing untuk meningkatkan akurasi ocr
-            processing_stages['Grayscale'] = gray  #gambar abu-abu biasa
-            processing_stages['Sharpened'] = cv2.filter2D(gray, -1, kernel_sharpen)  #dipertajam
-            _, otsu_frame = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
-            processing_stages['OTSU'] = otsu_frame  #threshold otomatis (binarisasi adaptif)
-            clahe_frame = self._clahe.apply(gray) #penajaman kontras lokal
-            processing_stages['CLAHE'] = clahe_frame  #peningkatan kontras lokal
+            #--- OPTIMASI KECEPATAN PREPROCESSING ---
+            #Hanya 2 stage: Grayscale (cepat, cukup untuk label cetak jelas) dan
+            #CLAHE (fallback untuk pencahayaan buruk). OTSU & Sharpened dihapus.
+            #Early-exit di confidence 0.82 agar stage ke-2 jarang dipakai.
+            clahe_frame = self._clahe.apply(gray)
+            processing_stages = {
+                'Grayscale': gray,        #stage 1: paling cepat, paling sering berhasil
+                'CLAHE':     clahe_frame, #stage 2: fallback pencahayaan buruk
+            }
 
             all_results = []
             all_results_with_bbox = []
@@ -707,21 +711,21 @@ class DetectionLogic(threading.Thread):
             #jalankan ocr pada setiap tahap preprocessing secara berurutan
             for stage_name, processed_frame in processing_stages.items():
                 try:
-                    is_upscale = 'Upscale' in stage_name
-                    min_sz = 18 if is_upscale else 8       #ukuran teks minimum yang dideteksi
-                    w_ths = 0.5 if current_preset == "DIN" else 0.7  #threshold pemisah kata
+                    min_sz = 8
+                    w_ths = 0.5 if current_preset == "DIN" else 0.7
 
                     results = self.reader.readtext(
                         processed_frame,
-                        detail=1,       #kembalikan koordinat bounding box
+                        detail=1,           #kembalikan koordinat bounding box
                         paragraph=False,
                         min_size=min_sz,
                         width_ths=w_ths,
-                        allowlist=allowlist_chars
+                        allowlist=allowlist_chars,
+                        decoder='greedy',   #greedy jauh lebih cepat dari beam search di CPU
+                        beamWidth=3,        #beam width kecil: hemat memori & waktu
                     )
 
-                    #skala balik koordinat bbox sesuai faktor resize yang digunakan
-                    stage_scale = scale_factor * (2.0 if is_upscale else 1.0)
+                    stage_scale = scale_factor
 
                     for result in results:
                         bbox, text, confidence = result
@@ -729,10 +733,10 @@ class DetectionLogic(threading.Thread):
                         all_results.append(text)
                         all_results_with_bbox.append({'text': text, 'bbox': scaled_bbox, 'confidence': confidence})
 
-                    #hentikan loop jika sudah ada hasil ocr dengan kepercayaan sangat tinggi
+                    #early-exit: hentikan jika stage pertama sudah cukup yakin
                     if all_results_with_bbox:
                         best_conf = max(r['confidence'] for r in all_results_with_bbox)
-                        if best_conf > 0.90:
+                        if best_conf > 0.82:
                             break
 
                 except Exception as e:
