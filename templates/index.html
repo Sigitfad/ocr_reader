@@ -411,6 +411,8 @@ select:focus, input[type=date]:focus { border-color: var(--accent); box-shadow: 
 .btn-modal { width: 100%; padding: 10px; border: none; border-radius: var(--r); background: var(--accent); color: #fff; font-family: var(--font); font-size: 14px; font-weight: 600; cursor: pointer; transition: background .15s; }
 .btn-modal:hover:not(:disabled) { background: #1d4ed8; }
 .btn-modal:disabled { opacity: .5; cursor: default; }
+#btn-export-cancel { display:none; background:#dc2626; font-weight:400; flex-direction:row; align-items:center; justify-content:center; gap:6px; }
+#btn-export-cancel:hover { background:#b91c1c; }
 
 /* progress */
 .progress-wrap { display: none; margin-top: 12px; }
@@ -765,6 +767,9 @@ select:focus, input[type=date]:focus { border-color: var(--accent); box-shadow: 
 
       </div>
       <div class="modal-footer">
+        <button class="btn-modal" id="btn-export-cancel" onclick="cancelExport()" style="display:none;background:#dc2626;color:#fff;margin-right:8px;font-weight:400;display:none">
+          <i class="bi bi-x-circle"></i> Batal Export
+        </button>
         <button class="btn-modal" id="btn-export-do" onclick="doExport()">
           <i class="bi bi-download"></i> Export
         </button>
@@ -795,6 +800,7 @@ const S = {
   preset:'JIS', label:'', running:false,
   jis:[], din:[], months:[],
   records:[], sel:new Set(), xrange:'Today',
+  exportCancelling: false,
 };
 
 /* Socket */
@@ -827,8 +833,10 @@ io_socket.on('export_progress', d => {
   el('x-prog-bar').style.width=p+'%'; el('x-prog-msg').textContent=d.msg;
 });
 io_socket.on('export_done', d => {
+  if(S.exportCancelling){ S.exportCancelling=false; return; }
   el('x-prog-wrap').style.display='none';
   const b=el('btn-export-do'); b.disabled=false; b.innerHTML='<i class="bi bi-download"></i> Export';
+  el('btn-export-cancel').style.display='none';
   if(d.ok&&d.path){ const fn=d.path.split(/[\\/]/).pop(); dlFile('/api/export/download/'+encodeURIComponent(fn),fn); bootstrap.Modal.getInstance(el('mExport'))?.hide(); toast('Berhasil','Diekspor: '+fn,'success'); }
   else if(d.no_data){ toast('Export Gagal','Gagal Export, Tidak ada data !','warning'); }
   else toast('Export Gagal',d.msg||'Kesalahan.','danger');
@@ -1181,14 +1189,24 @@ function onXMonthChk_off(){ el('x-month').disabled=true; el('x-year').disabled=t
 function onXDateChk_off(){ el('x-start').disabled=true; el('x-end').disabled=true; }
 
 async function doExport(){
+  S.exportCancelling = false;
   const b=el('btn-export-do'); b.disabled=true; b.innerHTML='<i class="bi bi-hourglass-split"></i> Memproses…';
+  el('btn-export-cancel').style.display='flex';
   el('x-prog-wrap').style.display='block'; el('x-prog-bar').style.width='0%'; el('x-prog-msg').textContent='';
   let range=S.xrange;
   if(el('x-mchk').checked) range='Month'; if(el('x-dchk').checked) range='CustomDate';
   if(!el('x-mchk').checked&&!el('x-dchk').checked) range=document.querySelector('input[name="xdate"]:checked').value;
   const payload={date_range:range,preset:el('x-preset').value,label:el('x-lchk').checked?el('x-label').value:'All Label',month:el('x-month').value,year:el('x-year').value,start_date:el('x-start').value,end_date:el('x-end').value};
   const r=await (await fetch('/api/export',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)})).json();
-  if(!r.ok){ toast('Error',r.msg,'danger'); b.disabled=false; b.innerHTML='<i class="bi bi-download"></i> Export'; el('x-prog-wrap').style.display='none'; }
+  if(!r.ok){ toast('Error',r.msg,'danger'); b.disabled=false; b.innerHTML='<i class="bi bi-download"></i> Export'; el('btn-export-cancel').style.display='none'; el('x-prog-wrap').style.display='none'; }
+}
+function cancelExport(){
+  S.exportCancelling = true;
+  fetch('/api/export/cancel',{method:'POST'}).catch(()=>{});
+  const b=el('btn-export-do'); b.disabled=false; b.innerHTML='<i class="bi bi-download"></i> Export';
+  el('btn-export-cancel').style.display='none';
+  el('x-prog-wrap').style.display='none';
+  toast('Info','Export dibatalkan.','warning');
 }
 
 /* Toast */

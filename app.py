@@ -48,6 +48,7 @@ class AppState:
         self.last_frame_b64 = None  #frame terakhir dalam format base64
         self.stream_lock = threading.Lock() #lock untuk akses thread-safe ke frame
         self.export_in_progress = False     #status apakah proses export sedang berjalan
+        self.export_cancelled = False        #flag untuk membatalkan export
 
 state = AppState()      #buat satu instance state global yang dipakai seluruh aplikasi
 create_directories()    #buat direktori yang diperlukan (images, excel, dll.) jika belum ada
@@ -387,10 +388,9 @@ def api_export():
     elif date_range == 'CustomDate':
         date_range_desc = f"{start_date}_to_{end_date}"
 
-    state.export_in_progress = True #tandai export sedang berjalan
+    state.export_in_progress = True
+    state.export_cancelled = False
 
-
-    #fungsi yang dijalankan di thread terpisah agar tidak memblokir server
     def do_export():
         try:
             result = execute_export(
@@ -398,10 +398,10 @@ def api_export():
                 date_range_desc=date_range_desc,
                 export_label=label_filter,
                 current_preset=actual_preset,
-                #kirim progres export secara real-time ke browser via SocketIO
                 progress_callback=lambda cur, tot, msg: socketio.emit(
                     'export_progress', {'current': cur, 'total': tot, 'msg': msg}
-                )
+                ),
+                cancel_flag=state
             )
             if result == "NO_DATA": #cek jika hasil export kosong, kirim notifikasi 'no_data' ke client
                 socketio.emit('export_done', {'ok': False, 'no_data': True, 'msg': 'Gagal Export, Tidak ada data !'})
@@ -427,11 +427,19 @@ def api_export_download(filename):
     if os.path.exists(filepath):
         return send_file(
             filepath,
-            as_attachment=True, #paksa browser untuk download (bukan tampilkan) 
+            as_attachment=True,
             download_name=filename,
             mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
         )
     return jsonify({'error': 'File not found'}), 404
+
+#API: membatalkan proses export yang sedang berjalan
+@app.route('/api/export/cancel', methods=['POST'])
+def api_export_cancel():
+    if state.export_in_progress:
+        state.export_cancelled = True
+        return jsonify({'ok': True, 'msg': 'Export dibatalkan'})
+    return jsonify({'ok': False, 'msg': 'Tidak ada export yang sedang berjalan'})
 
 #API: mengambil daftar label JIS, DIN, dan nama bulan untuk keperluan dropdown ui
 @app.route('/api/labels', methods=['GET'])

@@ -14,7 +14,7 @@ from config import DB_FILE, Resampling       #file database dan metode resize ga
 #-export_label    : label target yang dipilih untuk ditampilkan di header Excel
 #-current_preset  : preset (JIS/DIN) yang dipilih untuk ditampilkan di header Excel
 #-progress_callback : fungsi callback untuk melaporkan progres ke frontend via SocketIO
-def execute_export(sql_filter="", date_range_desc="", export_label="", current_preset="", progress_callback=None):
+def execute_export(sql_filter="", date_range_desc="", export_label="", current_preset="", progress_callback=None, cancel_flag=None):
 
     #fungsi helper: kirim update progres jika callback tersedia
     def update_progress(current, total, message=""):
@@ -162,6 +162,18 @@ def execute_export(sql_filter="", date_range_desc="", export_label="", current_p
         update_progress(40, 100, "Menulis data ke Excel...")
         total_rows = len(df)
         for row_num, row_data in df.iterrows():
+            #cek pembatalan oleh user
+            if cancel_flag is not None and getattr(cancel_flag, 'export_cancelled', False):
+                writer.close()
+                if os.path.exists(output_path):
+                    try: os.remove(output_path)
+                    except: pass
+                for t_path in temp_files_to_clean:
+                    if os.path.exists(t_path):
+                        try: os.remove(t_path)
+                        except: pass
+                return "CANCELLED"
+
             #update progres setiap 10 baris agar tidak terlalu sering memanggil callback
             if row_num % 10 == 0 or row_num == total_rows - 1:
                 progress = 40 + int((row_num / total_rows) * 50)
