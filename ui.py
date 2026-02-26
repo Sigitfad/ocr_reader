@@ -64,7 +64,7 @@ class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle(APP_NAME)
-        self.setWindowIcon(QIcon("logo_gs.png"))
+        self.setWindowIcon(QIcon("static/logo_gs.png"))
         self.setMinimumSize(1200, 650)
         self.setGeometry(100, 100, WINDOW_WIDTH, WINDOW_HEIGHT)
 
