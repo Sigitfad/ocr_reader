@@ -295,11 +295,11 @@ def create_export_dialog(parent, logic, preset_combo, jis_type_combo):
     #handler saat checkbox "Pilih Bulan" dicentang/dilepas
     def on_month_checkbox_toggled(checked):
         if checked:
-            rb_all.setChecked(True)           #paksa ke "Semua Data" agar radio tidak konflik
-            rb_today.setEnabled(False)        #nonaktifkan radio "Data Hari Ini"
-            month_combo.setEnabled(True)      #aktifkan combo bulan
-            year_combo.setEnabled(True)       #aktifkan combo tahun
-            cb_custom.setChecked(False)       #pastikan filter custom tidak aktif bersamaan
+            rb_all.setChecked(True)       #paksa ke "Semua Data" agar radio tidak konflik
+            rb_today.setEnabled(False)    #nonaktifkan radio "Data Hari Ini"
+            month_combo.setEnabled(True)  #aktifkan combo bulan
+            year_combo.setEnabled(True)   #aktifkan combo tahun
+            cb_custom.setChecked(False)   #pastikan filter custom tidak aktif bersamaan
             set_range("Month")
         else:
             rb_today.setEnabled(True)         #aktifkan kembali radio "Data Hari Ini"
@@ -358,16 +358,16 @@ def create_export_dialog(parent, logic, preset_combo, jis_type_combo):
     main_layout.addWidget(export_btn)
 
     #ekspos semua widget penting sebagai atribut dialog agar bisa diakses dari MainWindow
-    dialog.export_preset_combo = export_preset_combo       #combo tipe preset export
+    dialog.export_preset_combo = export_preset_combo   #combo tipe preset export
     dialog.export_label_filter_enabled = export_label_filter_enabled  #checkbox filter label
     dialog.export_label_type_combo = export_label_type_combo  #combo label yang dipilih
-    dialog.export_btn = export_btn                         #tombol export (disambung dari luar)
-    dialog.month_combo = month_combo                       #combo bulan
-    dialog.year_combo = year_combo                         #combo tahun
-    dialog.start_date_entry = start_date_entry             #input tanggal mulai
-    dialog.end_date_entry = end_date_entry                 #input tanggal akhir
-    dialog.toggle_selectors = toggle_selectors             #fungsi update selector
-    dialog.cb_month = cb_month                             #checkbox filter bulan
-    dialog.cb_custom = cb_custom                           #checkbox filter custom
+    dialog.export_btn = export_btn    #tombol export (disambung dari luar)
+    dialog.month_combo = month_combo  #combo bulan
+    dialog.year_combo = year_combo    #combo tahun
+    dialog.start_date_entry = start_date_entry  #input tanggal mulai
+    dialog.end_date_entry = end_date_entry      #input tanggal akhir
+    dialog.toggle_selectors = toggle_selectors  #fungsi update selector
+    dialog.cb_month = cb_month       #checkbox filter bulan
+    dialog.cb_custom = cb_custom     #checkbox filter custom
 
     return dialog  #kembalikan dialog ke MainWindow untuk ditampilkan dan dihubungkan ke handler

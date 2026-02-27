@@ -9,7 +9,7 @@ import numpy as np #operasi array/matriks untuk pemrosesan gambar
 from datetime import datetime #untuk mendapatkan tanggal saat ini dan format timestamp
 from difflib import SequenceMatcher  #untuk menghitung kemiripan string saat pencocokan kode
 from PIL import Image #pillow untuk manipulasi gambar dan konversi format untuk UI
-from config import ( #mengimpor konfigurasi dari file config.py
+from config import (  #mengimpor konfigurasi dari file config.py
     IMAGE_DIR, EXCEL_DIR, DB_FILE, PATTERNS, ALLOWLIST_JIS, ALLOWLIST_DIN, DIN_TYPES,
     CAMERA_WIDTH, CAMERA_HEIGHT, TARGET_WIDTH, TARGET_HEIGHT, BUFFER_SIZE,
     MAX_CAMERAS, SCAN_INTERVAL, JIS_TYPES
@@ -59,7 +59,7 @@ class DetectionLogic(threading.Thread):
         setup_database()  #inisialisasi database jika belum ada
         self.detected_codes = load_existing_data(self.current_date)  #muat data deteksi hari ini
 
-        #--- OCR READER ---
+        # ocr reader
         #Jika shared_reader diberikan (mode web/Flask), gunakan langsung tanpa load ulang.
         #Jika tidak ada (mode desktop standalone), load sendiri seperti biasa.
         if shared_reader is not None:
@@ -79,10 +79,10 @@ class DetectionLogic(threading.Thread):
         atexit.register(self.cleanup_temp_files)
 
         #state untuk menampilkan bounding box pada frame setelah kode terdeteksi
-        self.last_detected_bbox = None       #koordinat bounding box terakhir
-        self.last_detected_code = None       #kode yang terakhir terdeteksi
-        self.bbox_timestamp = 0              #waktu saat bounding box terakhir diperbarui
-        self.bbox_display_duration = 3.0     #durasi tampil bounding box (detik)
+        self.last_detected_bbox = None     #koordinat bounding box terakhir
+        self.last_detected_code = None     #kode yang terakhir terdeteksi
+        self.bbox_timestamp = 0            #waktu saat bounding box terakhir diperbarui
+        self.bbox_display_duration = 3.0   #durasi tampil bounding box (detik)
 
     #hapus file thumbnail sementara yang tersisa saat program ditutup
     def cleanup_temp_files(self):

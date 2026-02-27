@@ -19,8 +19,8 @@ DB_FILE = "detection.db"   #nama file database SQLite
 #pengaturan Kamera dan pemrosesan gambar
 CAMERA_WIDTH = 1280   #resolusi lebar frame dari kamera (px)
 CAMERA_HEIGHT = 720   #resolusi tinggi frame dari kamera (px)
-TARGET_WIDTH = 640    #lebar gambar setelah di-resize untuk OCR (px)
-TARGET_HEIGHT = 640   #tinggi gambar setelah di-resize untuk OCR (px)
+TARGET_WIDTH = 640    #lebar gambar setelah di-resize untuk ocr (px)
+TARGET_HEIGHT = 640   #tinggi gambar setelah di-resize untuk ocr (px)
 BUFFER_SIZE = 1       #jumlah frame yang di-buffer (1 = tanpa buffer berlebih)
 SCAN_INTERVAL = 1.0   #jeda antar scan ocr dalam detik (dipercepat dari 2.0)
 MAX_CAMERAS = 5       #maksimal kamera yang dicoba saat deteksi otomatis

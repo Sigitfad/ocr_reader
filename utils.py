@@ -10,14 +10,13 @@ os.environ['OPENCV_LOG_LEVEL'] = 'ERROR'
 os.environ['OPENCV_VIDEOIO_DEBUG'] = '0'
 cv2.setLogLevel(0)
 
-
 #untuk mengubah frame BGR menjadi gambar tepi (edge detection) berwarna hitam-putih
 #digunakan untuk mode "BINARY COLOR" dan "SPLIT SCREEN" pada tampilan kamera
 def apply_edge_detection(frame):
     gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)  #konversi ke grayscale
-    blurred = cv2.GaussianBlur(gray, (3, 3), 0)     #blur ringan untuk mengurangi noise
-    edges = cv2.Canny(blurred, 30, 100)             #deteksi tepi dengan algoritma Canny
-    kernel = np.ones((2, 2), np.uint8)          #kernel untuk dilasi (perlebar) tepi agar lebih jelas
+    blurred = cv2.GaussianBlur(gray, (3, 3), 0)    #blur ringan untuk mengurangi noise
+    edges = cv2.Canny(blurred, 30, 100)          #deteksi tepi dengan algoritma Canny
+    kernel = np.ones((2, 2), np.uint8)        #kernel untuk dilasi (perlebar) tepi agar lebih jelas
     edges_dilated = cv2.dilate(edges, kernel, iterations=1)  #perlebar garis tepi agar lebih tebal
     #buat frame BGR kosong (hitam) lalu warnai piksel tepi menjadi putih
     edges_bgr = np.zeros((edges_dilated.shape[0], edges_dilated.shape[1], 3), dtype=np.uint8)
@@ -214,7 +213,6 @@ def fix_common_ocr_errors(text, preset):
         return fix_common_ocr_errors_din(text)
     else:
         return fix_common_ocr_errors_jis(text)  #fallback ke JIS jika preset tidak dikenali
-
 
 #untuk konversi frame ke gambar biner (edge detection) untuk disimpan sebagai bukti deteksi
 def convert_frame_to_binary(frame):

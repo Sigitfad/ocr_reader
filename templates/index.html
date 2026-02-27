@@ -135,7 +135,42 @@ html, body { height: 100%; overflow: hidden; font-family: var(--font); font-size
 @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.3} }
 
 /* LAYOUT */
-#app { display: flex; height: calc(100vh - 54px); overflow: hidden; }
+#app { display: flex; height: calc(100vh - 54px - 44px); overflow: hidden; }
+
+/* FOOTER */
+#footer {
+  height: 44px;
+  background: var(--surface);
+  border-top: 1px solid var(--border);
+  display: flex; align-items: center;
+  padding: 0 18px; gap: 0;
+  flex-shrink: 0;
+  font-family: 'Montserrat', sans-serif;
+  overflow: hidden;
+}
+.ft-sep {
+  width: 1px; height: 18px;
+  background: var(--border-2);
+  margin: 0 14px; flex-shrink: 0;
+}
+.ft-item {
+  display: flex; align-items: center; gap: 7px;
+  white-space: nowrap; flex-shrink: 0;
+}
+.ft-label {
+  font-size: 13px; font-weight: 600;
+  letter-spacing: .8px; text-transform: uppercase;
+  color: var(--text-3);
+  font-family: 'Montserrat', sans-serif;
+}
+.ft-val {
+  font-family: 'Montserrat', sans-serif; font-weight: 700;
+  color: var(--text-1); font-size: 17px;
+}
+.ft-ok  { color: var(--green); }
+.ft-nok { color: var(--red); }
+.ft-qty { color: #1d4ed8; }
+html.dark .ft-qty { color: #60a5fa; }
 
 /* SIDE PANELS */
 .panel {
@@ -243,14 +278,6 @@ select:focus, input[type=date]:focus { border-color: var(--accent); box-shadow: 
 .ocr-item { font-family: var(--mono); font-size: 12px; color: var(--text-2); padding: 2px 0; line-height: 1.8; }
 
 /* STATISTIK */
-.stat-label-pill {
-  display: flex; align-items: center; justify-content: space-between;
-  padding: 22px 22px; border-radius: var(--r);
-  background: var(--accent-bg); border: 1px solid #bfdbfe;
-}
-.stat-label-key { font-size: 14px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; color: var(--accent); }
-.stat-label-val { font-family: 'Montserrat', sans-serif; font-size: 30px; font-weight: 700; color: var(--accent); letter-spacing: .5px; }
-
 .stat-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 10px; }
 .stat-card {
   background: var(--surface-2); border: 1px solid var(--border);
@@ -261,6 +288,8 @@ select:focus, input[type=date]:focus { border-color: var(--accent); box-shadow: 
 .c-total { color: var(--text-1); }
 .c-ok    { color: #1e40af; }
 .c-nok   { color: var(--red); }
+.c-label { color: var(--accent); }
+.c-qty   { color: #1d4ed8; }
 
 /* CENTER */
 #center { flex: 1; background: #1a1a1a; display: flex; flex-direction: column; min-width: 0; position: relative; }
@@ -531,11 +560,6 @@ select:focus, input[type=date]:focus { border-color: var(--accent); box-shadow: 
     <span class="brand-sub">Inspection Battery Cardboard</span>
   </div>
   <div class="top-right">
-    <div id="nav-datetime">
-      <span id="nav-date">Memuat…</span>
-      <span style="color:var(--border-2)">·</span>
-      <span id="nav-time">--:--:--</span>
-    </div>
     <button id="theme-btn" onclick="toggleTheme()" title="Toggle Dark/Light Mode">
       <i class="bi bi-moon-fill" id="theme-icon"></i>
     </button>
@@ -598,10 +622,22 @@ select:focus, input[type=date]:focus { border-color: var(--accent); box-shadow: 
 
   <div>
     <div class="label">Statistik</div>
-    <div class="stat-label-pill" style="margin-bottom:8px">
-      <span class="stat-label-key">Label</span>
-      <span class="stat-label-val" id="stat-label">—</span>
+    <!-- Baris 1: LABEL dan QTY PLAN — format sama persis dengan Total/OK/Not OK -->
+    <div class="stat-grid" style="grid-template-columns:repeat(2,1fr);margin-bottom:10px">
+      <div class="stat-card" style="display:flex;flex-direction:column;align-items:center;justify-content:space-between;">
+        <div style="flex:1;display:flex;align-items:center;justify-content:center;width:100%;min-height:53px;">
+          <div class="stat-num c-label" id="stat-label" style="font-size:35px;line-height:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%;display:block;text-align:center;">—</div>
+        </div>
+        <div class="stat-key">Label</div>
+      </div>
+      <div class="stat-card" style="display:flex;flex-direction:column;align-items:center;justify-content:space-between;">
+        <div style="flex:1;display:flex;align-items:center;justify-content:center;width:100%;min-height:53px;">
+          <div class="stat-num c-qty" id="stat-qty-plan">0</div>
+        </div>
+        <div class="stat-key">QTY Plan</div>
+      </div>
     </div>
+    <!-- Baris 2: TOTAL, OK, NOT OK -->
     <div class="stat-grid">
       <div class="stat-card"><div class="stat-num c-total" id="stat-total">0</div><div class="stat-key">Total</div></div>
       <div class="stat-card"><div class="stat-num c-ok"    id="stat-ok">0</div><div class="stat-key">OK</div></div>
@@ -668,6 +704,48 @@ select:focus, input[type=date]:focus { border-color: var(--accent); box-shadow: 
 </div>
 </div><!--/app-->
 
+<!-- FOOTER -->
+<footer id="footer">
+
+  <!-- KIRI: OK, Not OK, Actual hari ini -->
+  <div class="ft-item">
+    <span class="ft-label">OK</span>
+    <span class="ft-val ft-ok" id="ft-ok-total">0</span>
+  </div>
+  <div class="ft-sep"></div>
+  <div class="ft-item">
+    <span class="ft-label">Not OK</span>
+    <span class="ft-val ft-nok" id="ft-nok-total">0</span>
+  </div>
+  <div class="ft-sep"></div>
+  <div class="ft-item">
+    <span class="ft-label">Actual</span>
+    <span class="ft-val" id="ft-actual-total" style="color:var(--text-1)">0</span>
+  </div>
+
+  <!-- TENGAH: Label aktif + QTY Plan progress -->
+  <div style="flex:1;display:flex;align-items:center;justify-content:center;gap:8px;min-width:0;">
+    <span class="ft-label">Label</span>
+    <span class="ft-val" id="ft-center-label" style="color:var(--accent);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:180px;">—</span>
+    <span style="color:var(--border-2)">·</span>
+    <span class="ft-label">QTY Plan</span>
+    <span class="ft-val ft-qty" id="ft-qty-progress">—</span>
+  </div>
+
+  <!-- KANAN: Waktu dan Uptime -->
+  <div class="ft-item">
+    <span class="ft-label">Uptime</span>
+    <span class="ft-val" id="ft-uptime">00:00:00</span>
+  </div>
+  <div class="ft-sep"></div>
+  <div class="ft-item">
+    <span class="ft-val" id="ft-date">—</span>
+    <span style="color:var(--border-2)">·</span>
+    <span class="ft-val" id="ft-time">--:--:--</span>
+  </div>
+
+</footer>
+
 
 <!--MODAL: SETTING-->
 <div class="modal fade" id="mSetting" tabindex="-1">
@@ -698,6 +776,18 @@ select:focus, input[type=date]:focus { border-color: var(--accent); box-shadow: 
             </div>
             <input type="hidden" id="s-label">
             <div class="warn-note">* Pilih label terlebih dahulu</div>
+          </div>
+        </div>
+        <!-- QTY PLAN INPUT (di bawah Tipe & Label) -->
+        <div class="m-group">
+          <span class="m-title">QTY Plan</span>
+          <div style="display:flex;align-items:center;gap:10px;margin-top:6px">
+            <span style="font-size:13px;color:var(--text-2);white-space:nowrap">Target :</span>
+            <input type="number" id="s-qty-plan" min="0" max="999999" value="0"
+              style="width:130px;padding:8px 12px;border:1px solid var(--border);border-radius:var(--r-sm);
+                     font-size:14px;font-weight:400;color:#0000AA;font-family:var(--mono);text-align:center;outline:none;"
+              onfocus="this.style.borderColor='var(--accent)'" onblur="this.style.borderColor='var(--border)'">
+            <span style="font-size:12px;color:var(--text-3)">pcs</span>
           </div>
         </div>
       </div>
@@ -795,12 +885,49 @@ select:focus, input[type=date]:focus { border-color: var(--accent); box-shadow: 
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.2/js/bootstrap.bundle.min.js"></script>
 <script>
+/* ── QTY PLAN PER-LABEL PER-HARI ─────────────────────────────────────────────
+   Disimpan di localStorage dengan key: qty_plan:{label}:{YYYY-MM-DD}
+   Otomatis ter-reset setiap hari karena key menyertakan tanggal.
+   ─────────────────────────────────────────────────────────────────────────── */
+function todayStr(){ const n=new Date(); return `${n.getFullYear()}-${String(n.getMonth()+1).padStart(2,'0')}-${String(n.getDate()).padStart(2,'0')}`; }
+function qtyKey(label){ return `qty_plan:${label}:${todayStr()}`; }
+
+//muat QTY Plan yang sudah tersimpan untuk label tertentu (hari ini)
+function loadQtyForLabel(label){
+  if(!label) return 0;
+  const stored = localStorage.getItem(qtyKey(label));
+  return stored ? parseInt(stored)||0 : 0;
+}
+
+//simpan QTY Plan untuk label tertentu (hari ini)
+function saveQtyForLabel(label, qty){
+  if(!label) return;
+  if(qty > 0) localStorage.setItem(qtyKey(label), qty);
+  else localStorage.removeItem(qtyKey(label));
+}
+
+/* ──────────────────────────────────────────────────────────────────────────── */
+
+/* Auto-fit teks LABEL agar selalu muat 1 baris tanpa melebar */
+function fitLabelText(){
+  const lbl = el('stat-label');
+  if(!lbl) return;
+  const maxW = lbl.parentElement.clientWidth - 16;
+  let size = 35;
+  lbl.style.fontSize = size + 'px';
+  while(lbl.scrollWidth > maxW && size > 11){
+    size--;
+    lbl.style.fontSize = size + 'px';
+  }
+}
+
 /* State */
 const S = {
   preset:'JIS', label:'', running:false,
   jis:[], din:[], months:[],
   records:[], sel:new Set(), xrange:'Today',
   exportCancelling: false,
+  qty_plan: 0,   //nilai QTY Plan dari Setting
 };
 
 /* Socket */
@@ -860,7 +987,10 @@ async function init(){
   await loadCams();
   const sd=await (await fetch('/api/state')).json();
   S.preset=sd.preset||'JIS'; S.label=sd.target_label||'';
+  S.qty_plan=sd.qty_plan||0;
   el('s-preset').value=S.preset; syncSettingLabel();
+  el('s-qty-plan').value=S.qty_plan;
+  el('stat-qty-plan').textContent=S.qty_plan>0?S.qty_plan:'0';
   await refreshData();
 
   //--- CEK STATUS OCR MODEL ---
@@ -936,13 +1066,26 @@ function setScanIndicator(visible) {
 /* Clock & DateTime */
 const DN=['Minggu','Senin','Selasa','Rabu','Kamis','Jumat','Sabtu'];
 const MN=['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
+const _pageStart = Date.now(); //waktu halaman dibuka untuk uptime
+
 function startClock(){
-  const t=()=>{
+  const tick=()=>{
     const n=new Date();
-    el('nav-time').textContent=n.toLocaleTimeString('id-ID',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
-    el('nav-date').textContent=`${DN[n.getDay()]}, ${n.getDate()} ${MN[n.getMonth()]} ${n.getFullYear()}`;
+    const timeStr = n.toLocaleTimeString('id-ID',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
+    const dateStr = `${DN[n.getDay()]}, ${n.getDate()} ${MN[n.getMonth()]} ${n.getFullYear()}`;
+
+    //footer: tanggal dan jam
+    el('ft-date').textContent = dateStr;
+    el('ft-time').textContent = timeStr;
+
+    //uptime
+    const sec = Math.floor((Date.now() - _pageStart) / 1000);
+    const hh = String(Math.floor(sec/3600)).padStart(2,'0');
+    const mm = String(Math.floor((sec%3600)/60)).padStart(2,'0');
+    const ss = String(sec%60).padStart(2,'0');
+    el('ft-uptime').textContent = `${hh}:${mm}:${ss}`;
   };
-  t(); setInterval(t,1000);
+  tick(); setInterval(tick, 1000);
 }
 
 /* Dark/Light Theme */
@@ -978,6 +1121,7 @@ async function loadCams(){
 async function toggleCamera(){ S.running?await stopCam():await startCam(); }
 async function startCam(){
   if(!validLabel(S.label,S.preset)){ toast('Perhatian','Pilih label terlebih dahulu.','warning'); return; }
+  if(S.qty_plan <= 0){ toast('Perhatian','Isi QTY Plan terlebih dahulu di Setting.','warning'); return; }
   // Tampilkan loading di button
   const b=el('btn-start');
   b.className='btn btn-loading-state';
@@ -1022,6 +1166,7 @@ async function onOptionChange(){
 /* Scan File */
 function clickScanFile(){
   if(!validLabel(S.label,S.preset)){ toast('Perhatian','Pilih label terlebih dahulu.','warning'); return; }
+  if(S.qty_plan <= 0){ toast('Perhatian','Isi QTY Plan terlebih dahulu di Setting.','warning'); return; }
   if(S.running){ toast('Info','Stop kamera terlebih dahulu.','info'); return; }
   el('fhidden').click();
 }
@@ -1071,10 +1216,20 @@ function renderOcr(texts){
 function renderTable(records){
   S.records=records||[]; S.sel.clear();
   const tbody=el('code-tbody'), cnt=el('data-count');
+
+  //footer: total OK dan Not OK semua label hari ini
+  const allOk  = S.records.filter(r=>r.status==='OK').length;
+  const allNok = S.records.filter(r=>r.status==='Not OK').length;
+  el('ft-ok-total').textContent  = allOk;
+  el('ft-nok-total').textContent = allNok;
+  el('ft-actual-total').textContent = allOk + allNok;
+
   if(!validLabel(S.label,S.preset)){
     tbody.innerHTML='<tr><td colspan="3" style="padding:28px;text-align:center;color:var(--text-3)">Pilih label terlebih dahulu</td></tr>';
     cnt.textContent='0 record';
-    el('stat-label').textContent='—'; ['stat-total','stat-ok','stat-nok'].forEach(id=>el(id).textContent='0');
+    el('stat-label').textContent='—'; fitLabelText(); ['stat-total','stat-ok','stat-nok'].forEach(id=>el(id).textContent='0');
+    el('ft-qty-progress').textContent='—';
+    el('ft-center-label').textContent='—';
     return;
   }
   const filtered=[...S.records].reverse().filter(r=>(r.target||r.code)===S.label);
@@ -1098,8 +1253,14 @@ function renderTable(records){
     });
   }
   el('stat-label').textContent=S.label||'—';
+  fitLabelText();
   el('stat-total').textContent=filtered.length;
   el('stat-ok').textContent=ok; el('stat-nok').textContent=nok;
+
+  //footer QTY Plan progress: OK label aktif / Plan
+  const plan = S.qty_plan > 0 ? S.qty_plan : '?';
+  el('ft-qty-progress').textContent = `${ok} / ${plan}`;
+  el('ft-center-label').textContent = S.label || '—';
 }
 
 async function refreshData(){ const d=await (await fetch('/api/data/today')).json(); renderTable(d.records||[]); }
@@ -1132,6 +1293,9 @@ function hideSuccess(){ hide(el('success-popup')); }
 function openSetting(){
   if(S.running){ toast('Perhatian','Stop kamera sebelum membuka Setting.','warning'); return; }
   el('s-preset').value=S.preset; syncSettingLabel();
+  // Tampilkan qty tersimpan untuk label aktif saat ini
+  const storedQty = loadQtyForLabel(S.label);
+  el('s-qty-plan').value = storedQty > 0 ? storedQty : S.qty_plan;
   new bootstrap.Modal(el('mSetting')).show();
 }
 function syncSettingLabel(){
@@ -1144,7 +1308,20 @@ function syncSettingLabel(){
 async function saveSetting(){
   const p=el('s-preset').value, l=el('s-label').value;
   if(!validLabel(l,p)){ toast('Perhatian','Pilih label yang valid.','warning'); return; }
+
+  //simpan QTY Plan label lama sebelum ganti
+  if(S.label) saveQtyForLabel(S.label, S.qty_plan);
+
   S.preset=p; S.label=l;
+
+  //ambil nilai dari input (sudah otomatis terisi saat label dipilih di dropdown)
+  const qty = Math.max(0, parseInt(el('s-qty-plan').value)||0);
+  S.qty_plan = qty;
+  if(qty > 0) saveQtyForLabel(l, qty);  //simpan untuk label baru ini
+
+  el('stat-qty-plan').textContent = qty > 0 ? qty : '0';
+
+  await fetch('/api/qty_plan',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({qty_plan:S.qty_plan})});
   await fetch('/api/camera/settings',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({preset:S.preset,label:S.label,edge_mode:el('chk-edge').checked,split_mode:el('chk-split').checked})});
   await refreshData();
   bootstrap.Modal.getInstance(el('mSetting'))?.hide();
@@ -1196,7 +1373,7 @@ async function doExport(){
   let range=S.xrange;
   if(el('x-mchk').checked) range='Month'; if(el('x-dchk').checked) range='CustomDate';
   if(!el('x-mchk').checked&&!el('x-dchk').checked) range=document.querySelector('input[name="xdate"]:checked').value;
-  const payload={date_range:range,preset:el('x-preset').value,label:el('x-lchk').checked?el('x-label').value:'All Label',month:el('x-month').value,year:el('x-year').value,start_date:el('x-start').value,end_date:el('x-end').value};
+  const payload={date_range:range,preset:el('x-preset').value,label:el('x-lchk').checked?el('x-label').value:'All Label',month:el('x-month').value,year:el('x-year').value,start_date:el('x-start').value,end_date:el('x-end').value,qty_plan:S.qty_plan};
   const r=await (await fetch('/api/export',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)})).json();
   if(!r.ok){ toast('Error',r.msg,'danger'); b.disabled=false; b.innerHTML='<i class="bi bi-download"></i> Export'; el('btn-export-cancel').style.display='none'; el('x-prog-wrap').style.display='none'; }
 }
@@ -1255,6 +1432,12 @@ function ssSelect(el_opt){
   wrap.querySelector('input').value = data?data.label:'';
   wrap.classList.remove('open');
   _ssRender(wrapId, hiddenId, '');
+
+  //jika user memilih label di modal Setting, otomatis tampilkan QTY Plan tersimpan untuk label itu
+  if(wrapId === 'ss-label-wrap' && val){
+    const stored = loadQtyForLabel(val);
+    el('s-qty-plan').value = stored > 0 ? stored : 0;
+  }
 }
 
 function ssToggle(wrapId){
@@ -1291,6 +1474,7 @@ document.addEventListener('click', e=>{
 });
 
 init();
+window.addEventListener('resize', fitLabelText);
 </script>
 </body>
 </html>

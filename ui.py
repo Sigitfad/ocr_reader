@@ -18,7 +18,7 @@ from config import (
     APP_NAME, WINDOW_WIDTH, WINDOW_HEIGHT, CONTROL_PANEL_WIDTH, RIGHT_PANEL_WIDTH,
     JIS_TYPES, DIN_TYPES, MONTHS, MONTH_MAP
 )
-from datetime import datetime
+from datetime import datetime #untuk operasi tanggal/waktu
 from ui_setting import create_setting_dialog  #fungsi pembuat dialog pengaturan kamera
 from ui_export import create_export_dialog    #fungsi pembuat dialog export data
 import os #untuk operasi file
@@ -64,7 +64,7 @@ class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle(APP_NAME)
-        self.setWindowIcon(QIcon("logo_gs.png"))
+        self.setWindowIcon(QIcon("static/logo_gs.png"))
         self.setMinimumSize(1200, 650)
         self.setGeometry(100, 100, WINDOW_WIDTH, WINDOW_HEIGHT)
 
@@ -168,6 +168,17 @@ class MainWindow(QMainWindow):
         self.progress_dialog = None   #dialog progres export
         self.available_cameras = []   #daftar kamera yang terdeteksi
         self._prev_camera_index = 0   #index kamera sebelumnya (untuk revert jika gagal)
+        self.qty_plan = 0             #nilai QTY Plan dari setting (default 0 = belum diset)
+
+        #state untuk efek flash saat kode terdeteksi
+        self._flash_overlay = None         #widget overlay flash
+        self._flash_opacity_effect = None  #efek opacity overlay
+        self._flash_fade_timer = None      #timer fade out
+        self._flash_opacity_value = 0.0    #nilai opacity saat ini
+
+        #state untuk animasi pulse tombol saat kamera aktif
+        self._pulse_timer = None      #timer animasi pulse
+        self._pulse_state = False     #status warna pulse saat ini
 
         #hubungkan sinyal-sinyal internal ke handler yang berjalan di ui thread
         self.export_result_signal.connect(self._handle_export_result)
@@ -205,7 +216,7 @@ class MainWindow(QMainWindow):
         self.logic_thread = LogicSignals()
         self.logic = self.logic_thread.logic
 
-        #terapkan index kamera yang sedang dipilih jika combo sudah ada
+        #terapkan index kamera yang sedang dipilih jika sudah ada (misalnya setelah perubahan setting)
         if hasattr(self, 'camera_combo'):
             camera_index = self.camera_combo.currentData()
             if camera_index is not None:
@@ -217,7 +228,7 @@ class MainWindow(QMainWindow):
         self.logic_thread.data_reset_signal.connect(self.update_code_display) #sinyal untuk update tampilan data saat terjadi reset harian
         self.logic_thread.all_text_signal.connect(self.update_all_text_display) #sinyal untuk update tampilan semua teks ocr mentah
 
-    #tangkap tombol keyboard "F11" untuk toggle fullscreen
+    #fungsi tombol keyboard "F11" untuk toggle fullscreen
     def keyPressEvent(self, event: QKeyEvent):
         if event.key() == Qt.Key.Key_F11:
             self.toggle_fullscreen()
@@ -291,7 +302,7 @@ class MainWindow(QMainWindow):
 
         self.date_time_label.setText(formatted_time)
 
-    #bangun keseluruhan layout UI: panel kiri (kontrol), area video tengah, panel kanan (data)
+    #bangun keseluruhan layout ui: panel kiri (kontrol), area video tengah, panel kanan (data)
     def setup_ui(self):
         main_widget = QWidget()
         self.setCentralWidget(main_widget)
@@ -513,7 +524,8 @@ class MainWindow(QMainWindow):
             self.camera_combo,
             self.preset_combo,
             self.jis_type_combo,
-            self.available_cameras
+            self.available_cameras,
+            current_qty_plan=self.qty_plan   #kirim nilai QTY Plan saat ini ke dialog
         )
 
         if dialog:
@@ -542,7 +554,13 @@ class MainWindow(QMainWindow):
         stats_layout.setContentsMargins(10, 15, 10, 10)
         stats_layout.setSpacing(8)
 
-        #box 1: menampilkan label target yang sedang aktif
+        # ── BARIS: LABEL (kiri) dan QTY PLAN (kanan) bersebelahan ─────────────
+        label_qty_row = QWidget()
+        label_qty_layout = QHBoxLayout(label_qty_row)
+        label_qty_layout.setContentsMargins(0, 0, 0, 0)
+        label_qty_layout.setSpacing(8)
+
+        #box LABEL: menampilkan label target yang sedang aktif
         self.label_box = QGroupBox("LABEL")
         self.label_box.setFont(QFont("Arial", 8, QFont.Bold))
         self.label_box.setStyleSheet("""
@@ -554,7 +572,7 @@ class MainWindow(QMainWindow):
             }
             QGroupBox::title {
                 subcontrol-origin: margin;
-                left: 92px;
+                left: 30px;
                 padding: 2px 3px;
                 color: black;
             }
@@ -567,6 +585,36 @@ class MainWindow(QMainWindow):
         self.label_display.setAlignment(Qt.AlignCenter)
         self.label_display.setStyleSheet("border: none; color: blue;")
         label_box_layout.addWidget(self.label_display)
+
+        #box QTY PLAN: menampilkan target jumlah produksi dari Setting
+        self.qty_plan_box = QGroupBox("QTY Plan")
+        self.qty_plan_box.setFont(QFont("Arial", 8, QFont.Bold))
+        self.qty_plan_box.setStyleSheet("""
+            QGroupBox {
+                border: 1px solid #666;
+                border-radius: 6px;
+                margin-top: 8px;
+                padding-top: 5px;
+            }
+            QGroupBox::title {
+                subcontrol-origin: margin;
+                left: 16px;
+                padding: 2px 3px;
+                color: black;
+            }
+        """)
+        qty_plan_box_layout = QVBoxLayout(self.qty_plan_box)
+        qty_plan_box_layout.setContentsMargins(5, 10, 5, 5)
+
+        self.qty_plan_display = QLabel("0")
+        self.qty_plan_display.setFont(QFont("Arial", 10, QFont.Bold))
+        self.qty_plan_display.setAlignment(Qt.AlignCenter)
+        self.qty_plan_display.setStyleSheet("border: none; color: #999999;")
+        qty_plan_box_layout.addWidget(self.qty_plan_display)
+
+        label_qty_layout.addWidget(self.label_box, 1)
+        label_qty_layout.addWidget(self.qty_plan_box, 1)
+        # ──────────────────────────────────────────────────────────────────────
 
         #box 2: menampilkan total semua deteksi untuk label aktif hari ini
         self.total_box = QGroupBox("TOTAL")
@@ -655,7 +703,7 @@ class MainWindow(QMainWindow):
         bottom_layout.addWidget(self.ok_box)
         bottom_layout.addWidget(self.not_ok_box)
 
-        stats_layout.addWidget(self.label_box)
+        stats_layout.addWidget(label_qty_row)
         stats_layout.addWidget(self.total_box)
         stats_layout.addWidget(bottom_row)
 
@@ -667,6 +715,15 @@ class MainWindow(QMainWindow):
         self.total_display.setText(str(total_count))
         self.ok_display.setText(str(ok_count))
         self.not_ok_display.setText(str(not_ok_count))
+
+    #perbarui tampilan kotak QTY Plan di statistik setelah Save Setting
+    def _update_qty_plan_display(self):
+        if self.qty_plan > 0:
+            self.qty_plan_display.setText(str(self.qty_plan))
+            self.qty_plan_display.setStyleSheet("border: none; color: #0000AA;")
+        else:
+            self.qty_plan_display.setText("0")
+            self.qty_plan_display.setStyleSheet("border: none; color: #999999;")
 
     #perbarui tampilan teks ocr mentah di panel kiri (OUTPUT TEXT)
     def update_all_text_display(self, text_list):
@@ -875,6 +932,12 @@ class MainWindow(QMainWindow):
                 "Tolong pilih label dengan benar!")
             return
 
+        #pastikan QTY Plan sudah diisi sebelum memulai
+        if self.qty_plan <= 0:
+            QMessageBox.warning(self, "Warning",
+                "Tolong isi QTY Plan terlebih dahulu di SETTING!")
+            return
+
         self._setup_logic_thread()  #buat thread logika baru (reinisialisasi)
 
         self.is_camera_running = True
@@ -912,6 +975,7 @@ class MainWindow(QMainWindow):
             self.logic_thread.start()   #mulai Qt event loop thread
 
         self._hide_success_popup()
+        self._start_pulse_animation()  #mulai animasi pulse tombol STOP
 
     #hentikan kamera, kembalikan tampilan tombol, dan unlock kontrol label
     def stop_detection(self):
@@ -949,6 +1013,7 @@ class MainWindow(QMainWindow):
             self.logic_thread.wait()
 
         self._hide_success_popup()
+        self._stop_pulse_animation()  #hentikan animasi pulse tombol
 
     #perbarui status kamera di ui (aktifkan/nonaktifkan combo kamera)
     def update_camera_status(self, status_text, is_running):
@@ -984,6 +1049,12 @@ class MainWindow(QMainWindow):
             QMessageBox.critical(self, "Gagal Deteksi", "Tidak ada label yang terdeteksi pada gambar.")
             self._reset_file_scan_button()
         else:
+            #jalankan efek flash sesuai mode (live camera vs scan file)
+            if self.logic and self.logic.running:
+                self._start_flash_effect()   #flash hijau di area video (Live Camera)
+            else:
+                self._start_file_flash_effect()  #flash hijau di tombol scan file
+
             self.show_detection_success(detected_code)  #tampilkan popup sukses
             if self.logic and not self.logic.running:
                 self._reset_file_scan_button()
@@ -1102,6 +1173,86 @@ class MainWindow(QMainWindow):
             self.current_success_popup.deleteLater()  #hapus widget dari memori Qt
             self.current_success_popup = None
 
+    # ============================================================
+    # EFEK FLASH SAAT KODE TERDETEKSI (seperti flash kamera: putih seketika lalu balik normal)
+    # ============================================================
+
+    #flash smooth: overlay putih transparan muncul lalu fade out di atas area foto
+    def _start_flash_effect(self):
+        #buat widget overlay putih transparan di atas video_label
+        self._flash_overlay = QWidget(self.video_label)
+        self._flash_overlay.setGeometry(self.video_label.rect())
+        self._flash_overlay.setStyleSheet("background-color: white;")
+        self._flash_overlay.setAttribute(Qt.WA_TransparentForMouseEvents)
+
+        #set opacity awal 0.5 via QGraphicsOpacityEffect
+        from PySide6.QtWidgets import QGraphicsOpacityEffect
+        self._flash_opacity_effect = QGraphicsOpacityEffect()
+        self._flash_opacity_effect.setOpacity(0.5)
+        self._flash_overlay.setGraphicsEffect(self._flash_opacity_effect)
+        self._flash_overlay.show()
+
+        #fade out: turunkan opacity dari 0.5 ke 0 secara bertahap tiap 30ms
+        self._flash_opacity_value = 0.5
+        self._flash_fade_timer = QTimer(self)
+        self._flash_fade_timer.timeout.connect(self._do_flash_fade)
+        self._flash_fade_timer.start(30)
+
+    #turunkan opacity overlay sedikit demi sedikit hingga hilang (smooth fade out)
+    def _do_flash_fade(self):
+        self._flash_opacity_value -= 0.05
+        if self._flash_opacity_value <= 0:
+            self._flash_fade_timer.stop()
+            self._flash_overlay.hide()
+            self._flash_overlay.deleteLater()
+            self._flash_overlay = None
+        else:
+            self._flash_opacity_effect.setOpacity(self._flash_opacity_value)
+
+    def _start_file_flash_effect(self):
+        self._start_flash_effect()
+
+    # ============================================================
+    # ANIMASI PULSE TOMBOL SAAT KAMERA AKTIF
+    # ============================================================
+
+    #mulai animasi pulse pada tombol STOP saat kamera berjalan
+    def _start_pulse_animation(self):
+        if self._pulse_timer and self._pulse_timer.isActive():
+            self._pulse_timer.stop()
+
+        self._pulse_state = False
+        self._pulse_timer = QTimer(self)
+        self._pulse_timer.timeout.connect(self._do_pulse_tick)
+        self._pulse_timer.start(700)  #bergantian setiap 700ms
+
+    #hentikan animasi pulse dan kembalikan warna tombol ke semula
+    def _stop_pulse_animation(self):
+        if self._pulse_timer and self._pulse_timer.isActive():
+            self._pulse_timer.stop()
+        if hasattr(self, 'btn_camera_toggle'):
+            self.btn_camera_toggle.setStyleSheet(self.BUTTON_STYLES['success'])
+
+    #satu tick animasi pulse: bergantian antara merah gelap dan merah cerah
+    def _do_pulse_tick(self):
+        self._pulse_state = not self._pulse_state
+
+        if self._pulse_state:
+            self.btn_camera_toggle.setStyleSheet("""
+                QPushButton {
+                    background-color: #FF1A1A;
+                    color: white;
+                    border: none;
+                    border-radius: 4px;
+                    padding: 6px 12px;
+                    font-size: 13px;
+                    font-weight: bold;
+                    min-height: 32px;
+                }
+            """)
+        else:
+            self.btn_camera_toggle.setStyleSheet(self.BUTTON_STYLES['danger'])
+
     #hapus record yang dipilih di daftar dari database dan UI setelah konfirmasi
     def delete_selected_codes(self):
         selected_items = self.code_tree.selectedItems()
@@ -1145,6 +1296,12 @@ class MainWindow(QMainWindow):
         if not self._is_valid_label(selected_type, current_preset):
             QMessageBox.warning(self, "Warning",
                 "Tolong pilih label dengan benar!")
+            return
+
+        #pastikan QTY Plan sudah diisi sebelum scan file
+        if self.qty_plan <= 0:
+            QMessageBox.warning(self, "Warning",
+                "Tolong isi QTY Plan terlebih dahulu di SETTING!")
             return
 
         if self.logic and self.logic.running:
@@ -1306,7 +1463,8 @@ class MainWindow(QMainWindow):
                         sql_filter,
                         date_range_desc,
                         dialog.export_label_type_combo.currentText() if dialog.export_label_filter_enabled.isChecked() else "",
-                        selected_export_preset
+                        selected_export_preset,
+                        self.qty_plan   #kirim nilai QTY Plan ke fungsi export
                     ),
                     daemon=True
                 ).start()
@@ -1330,7 +1488,7 @@ class MainWindow(QMainWindow):
             self.btn_export.setEnabled(True)
 
     #fungsi yang dijalankan di background thread untuk eksekusi proses export excel
-    def _execute_export_thread(self, sql_filter, date_range_desc, export_label="", current_preset=""):
+    def _execute_export_thread(self, sql_filter, date_range_desc, export_label="", current_preset="", qty_plan=0):
         from export import execute_export
 
         if not self.logic:
@@ -1341,7 +1499,7 @@ class MainWindow(QMainWindow):
         def progress_callback(current, total, message):
             self.export_progress_signal.emit(message, f"{current}")
 
-        result = execute_export(sql_filter, date_range_desc, export_label, current_preset, progress_callback)
+        result = execute_export(sql_filter, date_range_desc, export_label, current_preset, progress_callback, qty_plan=qty_plan)
 
         self.export_result_signal.emit(result)  #kirim hasil ke ui thread via sinyal
 

@@ -11,7 +11,6 @@ from datetime import datetime, date  #untuk mengambil tanggal dan waktu saat ini
 from flask import Flask, render_template, request, jsonify, send_file, Response  #komponen utama Flask web framework
 from flask_socketio import SocketIO, emit  #websocket untuk komunikasi real-time ke browser
 
-
 #menentukan direktori tempat file ini berada dan menambahkannya ke sys.path
 #agar modul lokal (config, database, dll.) bisa di-import tanpa error
 THIS_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -47,14 +46,14 @@ class AppState:
         self.available_cameras = [] #daftar kamera yang terdeteksi
         self.last_frame_b64 = None  #frame terakhir dalam format base64
         self.stream_lock = threading.Lock() #lock untuk akses thread-safe ke frame
-        self.export_in_progress = False     #status apakah proses export sedang berjalan
-        self.export_cancelled = False        #flag untuk membatalkan export
+        self.export_in_progress = False  #status apakah proses export sedang berjalan
+        self.export_cancelled = False    #flag untuk membatalkan export
+        self.qty_plan = 0               #target jumlah produksi dari Setting (0 = belum diset)
 
-state = AppState()      #buat satu instance state global yang dipakai seluruh aplikasi
-create_directories()    #buat direktori yang diperlukan (images, excel, dll.) jika belum ada
-setup_database()        #inisialisasi database (buat tabel jika belum ada)
+state = AppState()    #buat satu instance state global yang dipakai seluruh aplikasi
+create_directories()  #buat direktori yang diperlukan (images, excel, dll.) jika belum ada
+setup_database()      #inisialisasi database (buat tabel jika belum ada)
 
-#--- SINGLETON OCR READER ---
 #Reader di-load SEKALI saat server pertama kali jalan, bukan saat tombol Start ditekan.
 #Ini menghilangkan delay 5-30 detik yang terjadi setiap kali pengguna menekan Start.
 #Reader disimpan di state agar bisa dipakai ulang oleh setiap instance DetectionLogic.
@@ -78,7 +77,7 @@ def _init_ocr_reader():
 #Jalankan load model di background thread agar server tidak freeze saat startup
 import threading as _threading
 state.ocr_reader = None
-state.ocr_ready  = threading.Event()  #event untuk sinkronisasi: reader sudah siap
+state.ocr_ready  = threading.Event()  #event untuk sinkronisasi jika reader sudah siap
 
 def _ocr_loader_thread():
     state.ocr_reader = _init_ocr_reader()
@@ -88,8 +87,8 @@ _threading.Thread(target=_ocr_loader_thread, daemon=True).start()
 
 #fungsi untuk menginisialisasi logika deteksi ocr beserta semua callback-nya
 def _init_detection_logic():
-    from ocr import DetectionLogic  #import kelas utama ocr dari file ocr.py
-    from PIL import Image           #PIL untuk manipulasi gambar (dipakai di callback)
+    from ocr import DetectionLogic #import kelas utama ocr dari file ocr.py
+    from PIL import Image          #PIL untuk manipulasi gambar (dipakai di callback)
 
     #kelas pengganti sinyal Qt/PyQt agar kompatibel dengan Flask (tanpa GUI)
     class FakeSignal:
@@ -109,7 +108,7 @@ def _init_detection_logic():
             b64 = base64.b64encode(buf.getvalue()).decode('utf-8')   #encode ke base64
             with state.stream_lock:
                 state.last_frame_b64 = b64  #simpan frame terakhir
-            socketio.emit('frame', {'img': b64})    #kirim frame ke browser via WebSocket
+            socketio.emit('frame', {'img': b64})  #kirim frame ke browser via WebSocket
         except Exception as e:
             print(f"[frame error] {e}")
 
@@ -401,37 +400,47 @@ def api_export():
                 progress_callback=lambda cur, tot, msg: socketio.emit(
                     'export_progress', {'current': cur, 'total': tot, 'msg': msg}
                 ),
-                cancel_flag=state
+                cancel_flag=state,
+                qty_plan=state.qty_plan
             )
-            if result == "NO_DATA": #cek jika hasil export kosong, kirim notifikasi 'no_data' ke client
+            if result == "NO_DATA":
                 socketio.emit('export_done', {'ok': False, 'no_data': True, 'msg': 'Gagal Export, Tidak ada data !'})
-            elif result and result.startswith("EXPORT_ERROR:"): #jika ada pesan error spesifik dari proses export
+            elif result and result.startswith("EXPORT_ERROR:"):
                 socketio.emit('export_done', {'ok': False, 'msg': result.replace("EXPORT_ERROR: ", "")})
-            #jika berhasil, kirim path file hasil export ke client
             else:
-                socketio.emit('export_done', {'ok': True, 'path': result})
-        #tangkap error sistem yang tidak terduga dan kirim pesan errornya
+                #file berhasil dibuat — kirim nama file ke frontend untuk di-download
+                fn = os.path.basename(result)
+                socketio.emit('export_done', {'ok': True, 'path': result, 'filename': fn})
         except Exception as e:
             socketio.emit('export_done', {'ok': False, 'msg': str(e)})
-        #pastikan status 'in_progress' diubah kembali ke False setelah proses selesai/gagal
         finally:
             state.export_in_progress = False
 
     threading.Thread(target=do_export, daemon=True).start()
     return jsonify({'ok': True, 'msg': 'Export dimulai'}) #berikan respon cepat ke client bahwa proses export sudah mulai berjalan
 
-#API: mengunduh file Excel hasil export berdasarkan nama file
+#API: mengunduh file Excel hasil export, lalu hapus dari disk agar tidak memakan storage
 @app.route('/api/export/download/<path:filename>')
 def api_export_download(filename):
     filepath = os.path.join(EXCEL_DIR, filename)
-    if os.path.exists(filepath):
-        return send_file(
-            filepath,
-            as_attachment=True,
-            download_name=filename,
-            mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-        )
-    return jsonify({'error': 'File not found'}), 404
+    if not os.path.exists(filepath):
+        return jsonify({'error': 'File not found'}), 404
+
+    #baca file ke memori, lalu hapus dari disk segera
+    with open(filepath, 'rb') as f:
+        file_data = f.read()
+    try:
+        os.remove(filepath)  #hapus file dari directory agar tidak memakan disk
+    except Exception:
+        pass
+
+    return Response(
+        file_data,
+        headers={
+            'Content-Disposition': f'attachment; filename="{filename}"',
+            'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        }
+    )
 
 #API: membatalkan proses export yang sedang berjalan
 @app.route('/api/export/cancel', methods=['POST'])
@@ -460,7 +469,19 @@ def api_state():
         'camera_index':  state.camera_index,
         'edge_mode':     state.edge_mode,
         'split_mode':    state.split_mode,
+        'qty_plan':      state.qty_plan,   #sertakan qty_plan agar bisa disinkronkan ke frontend
     })
+
+#API: menyimpan nilai QTY Plan dari Setting di browser ke state aplikasi
+@app.route('/api/qty_plan', methods=['POST'])
+def api_set_qty_plan():
+    data = request.json or {}
+    try:
+        qty = int(data.get('qty_plan', 0))
+        state.qty_plan = max(0, qty)  #pastikan tidak negatif
+        return jsonify({'ok': True, 'qty_plan': state.qty_plan})
+    except (ValueError, TypeError):
+        return jsonify({'ok': False, 'msg': 'Nilai QTY Plan tidak valid'})
 
 #event SocketIO: saat client (browser) terhubung, kirim data awal
 @socketio.on('connect')
@@ -483,11 +504,10 @@ def on_disconnect():
 
 #entry point: jalankan server Flask-SocketIO saat file dieksekusi langsung
 if __name__ == '__main__':
-    print("=" * 55)
-    print(f"  {APP_NAME} — KartonOCR")
-    print("=" * 55)
-    print("  Buka browser dan akses: http://localhost:5000")
-    print("  Tekan Ctrl+C untuk menghentikan server")
-    print("=" * 55)
+    print("=" * 30)
+    print(f"         {APP_NAME} — KartonOCR")
+    print("      Ctrl + C untuk Stop")
+    print(" Akses: http://localhost:5000")
+    print("=" * 30)
     #jalankan server di semua interface (0.0.0.0) port 5000
     socketio.run(app, host='0.0.0.0', port=5000, debug=False, allow_unsafe_werkzeug=True)
