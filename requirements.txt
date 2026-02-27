@@ -10,4 +10,8 @@ numpy==1.26.4 #library komputasi numerik untuk array dan matrix, menjadi dasar b
 PySide6==6.8.1 #framework GUI berbasis Qt untuk membuat aplikasi desktop Python.
 torch==2.1.2 #library deep learning (PyTorch), menjadi backend untuk easyocr.
 torchvision==0.16.2 #ekstensi PyTorch untuk pengolahan gambar dan model computer vision.
+<<<<<<< HEAD
 torchaudio==2.1.2 #ekstensi PyTorch untuk pengolahan audio (tidak selalu wajib untuk ocr,tapi bagian dari ekosistem PyTorch).
+=======
+torchaudio==2.1.2 #ekstensi PyTorch untuk pengolahan audio (tidak selalu wajib untuk ocr,tapi bagian dari ekosistem PyTorch).
+>>>>>>> 5d41a73aea816b3d946db1b23394795e56c486dd

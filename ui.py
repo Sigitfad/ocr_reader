@@ -180,6 +180,16 @@ class MainWindow(QMainWindow):
         self._pulse_timer = None      #timer animasi pulse
         self._pulse_state = False     #status warna pulse saat ini
 
+        #state untuk efek flash saat kode terdeteksi
+        self._flash_overlay = None         #widget overlay flash
+        self._flash_opacity_effect = None  #efek opacity overlay
+        self._flash_fade_timer = None      #timer fade out
+        self._flash_opacity_value = 0.0    #nilai opacity saat ini
+
+        #state untuk animasi pulse tombol saat kamera aktif
+        self._pulse_timer = None      #timer animasi pulse
+        self._pulse_state = False     #status warna pulse saat ini
+
         #hubungkan sinyal-sinyal internal ke handler yang berjalan di ui thread
         self.export_result_signal.connect(self._handle_export_result)
         self.export_status_signal.connect(self._update_export_button_ui)
