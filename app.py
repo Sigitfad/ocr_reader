@@ -390,6 +390,12 @@ def api_export():
     state.export_in_progress = True
     state.export_cancelled = False
 
+    #QTY Plan hanya ditampilkan jika "Hari Ini" DAN label spesifik dipilih (bukan All Label)
+    show_qty_plan = (
+        date_range == 'Today' and
+        label_filter not in ['All Label', '', None]
+    )
+
     def do_export():
         try:
             result = execute_export(
@@ -401,7 +407,8 @@ def api_export():
                     'export_progress', {'current': cur, 'total': tot, 'msg': msg}
                 ),
                 cancel_flag=state,
-                qty_plan=state.qty_plan
+                qty_plan=state.qty_plan,
+                show_qty_plan=show_qty_plan
             )
             if result == "NO_DATA":
                 socketio.emit('export_done', {'ok': False, 'no_data': True, 'msg': 'Gagal Export, Tidak ada data !'})

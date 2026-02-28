@@ -15,7 +15,7 @@ from config import DB_FILE, Resampling     #file database dan metode resize gamb
 #-current_preset  : preset (JIS/DIN) yang dipilih untuk ditampilkan di header Excel
 #-progress_callback : fungsi callback untuk melaporkan progres ke frontend via SocketIO
 #-qty_plan        : target jumlah produksi yang diset di Setting (0 = tidak diset)
-def execute_export(sql_filter="", date_range_desc="", export_label="", current_preset="", progress_callback=None, cancel_flag=None, qty_plan=0):
+def execute_export(sql_filter="", date_range_desc="", export_label="", current_preset="", progress_callback=None, cancel_flag=None, qty_plan=0, show_qty_plan=True):
 
     #fungsi helper: kirim update progres jika callback tersedia
     def update_progress(current, total, message=""):
@@ -84,7 +84,8 @@ def execute_export(sql_filter="", date_range_desc="", export_label="", current_p
         qty_ok = len(df[df['status'] == 'OK'])
         qty_not_ok = len(df[df['status'] == 'Not OK'])
 
-        START_ROW_DATA = 8  #baris Excel tempat data mulai ditulis (baris 1-7 untuk info/header + QTY Plan)
+        #jika show_qty_plan=False, baris QTY Plan dihilangkan sehingga data mulai lebih awal
+        START_ROW_DATA = 8 if show_qty_plan else 7  #baris Excel tempat data mulai ditulis
 
         #siapkan DataFrame: ubah format timestamp, tambah kolom nomor urut dan kolom gambar
         update_progress(25, 100, "Menyiapkan data untuk Excel...")
@@ -143,16 +144,20 @@ def execute_export(sql_filter="", date_range_desc="", export_label="", current_p
         worksheet.merge_range('A5:B5', status_not_ok_text, info_merge_format)
 
         qty_text = f"QTY Actual : {qty_actual}"
-        worksheet.merge_range('A7:B7', qty_text, info_merge_format)
 
-        #tulis baris QTY Plan — nilai target dari Setting (tampilkan "-" jika belum diset)
-        qty_plan_str = str(qty_plan) if qty_plan > 0 else "-"
-        qty_plan_text = f"QTY Plan : {qty_plan_str}"
-        qty_plan_format = workbook.add_format({
-            'bold': True, 'align': 'left', 'valign': 'vleft', 'font_size': 11,
-            'font_color': "#000000"   #warna biru agar mudah dibedakan dari baris lain
-        })
-        worksheet.merge_range('A6:B6', qty_plan_text, qty_plan_format)
+        if show_qty_plan:
+            #tulis QTY Plan di baris ke-6, QTY Actual di baris ke-7
+            qty_plan_str = str(qty_plan) if qty_plan > 0 else "-"
+            qty_plan_text = f"QTY Plan : {qty_plan_str}"
+            qty_plan_format = workbook.add_format({
+                'bold': True, 'align': 'left', 'valign': 'vleft', 'font_size': 11,
+                'font_color': "#000000"
+            })
+            worksheet.merge_range('A6:B6', qty_plan_text, qty_plan_format)
+            worksheet.merge_range('A7:B7', qty_text, info_merge_format)
+        else:
+            #QTY Plan tidak ditampilkan — QTY Actual langsung di baris ke-6
+            worksheet.merge_range('A6:B6', qty_text, info_merge_format)
 
         #nama kolom (header tabel) pada baris ke-7 dengan format header biru
         for col_num, value in enumerate(df.columns.values):

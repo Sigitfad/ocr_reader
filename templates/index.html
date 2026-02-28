@@ -171,6 +171,26 @@ html, body { height: 100%; overflow: hidden; font-family: var(--font); font-size
 .ft-nok { color: var(--red); }
 .ft-qty { color: #1d4ed8; }
 html.dark .ft-qty { color: #60a5fa; }
+.ft-qty-badge {
+  background: #facc15;
+  color: #1a1a1a;
+  font-family: 'Montserrat', sans-serif;
+  font-weight: 700;
+  font-size: 16px;
+  padding: 1px 8px;
+  border-radius: 4px;
+  line-height: 1.6;
+}
+.ft-qty-progress {
+  background: #2196f3;
+  color: #ffffff;
+  font-family: 'Montserrat', sans-serif;
+  font-weight: 700;
+  font-size: 16px;
+  padding: 1px 8px;
+  border-radius: 4px;
+  line-height: 1.6;
+}
 
 /* SIDE PANELS */
 .panel {
@@ -416,7 +436,7 @@ select:focus, input[type=date]:focus { border-color: var(--accent); box-shadow: 
 .badge-nok { display: inline-block; padding: 2px 10px; border-radius: 99px; font-size: 11px; font-weight: 600; background: var(--red-bg); color: var(--red); border: 1px solid #fecaca; }
 
 .data-head { display: flex; align-items: center; justify-content: space-between; }
-.data-count { font-size: 15px; font-weight: 600; color: var(--text-2); font-family: var(--mono); }
+.data-count { font-size: 15px; font-weight: 600; color: var(--text-2); font-family: 'Montserrat', sans-serif; }
 
 /* Override label size only for Data Barang heading */
 .data-head .label { font-size: 14px; letter-spacing: 1px; margin: 0; }
@@ -622,22 +642,6 @@ select:focus, input[type=date]:focus { border-color: var(--accent); box-shadow: 
 
   <div>
     <div class="label">Statistik</div>
-    <!-- Baris 1: LABEL dan QTY PLAN — format sama persis dengan Total/OK/Not OK -->
-    <div class="stat-grid" style="grid-template-columns:repeat(2,1fr);margin-bottom:10px">
-      <div class="stat-card" style="display:flex;flex-direction:column;align-items:center;justify-content:space-between;">
-        <div style="flex:1;display:flex;align-items:center;justify-content:center;width:100%;min-height:53px;">
-          <div class="stat-num c-label" id="stat-label" style="font-size:35px;line-height:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%;display:block;text-align:center;">—</div>
-        </div>
-        <div class="stat-key">Label</div>
-      </div>
-      <div class="stat-card" style="display:flex;flex-direction:column;align-items:center;justify-content:space-between;">
-        <div style="flex:1;display:flex;align-items:center;justify-content:center;width:100%;min-height:53px;">
-          <div class="stat-num c-qty" id="stat-qty-plan">0</div>
-        </div>
-        <div class="stat-key">QTY Plan</div>
-      </div>
-    </div>
-    <!-- Baris 2: TOTAL, OK, NOT OK -->
     <div class="stat-grid">
       <div class="stat-card"><div class="stat-num c-total" id="stat-total">0</div><div class="stat-key">Total</div></div>
       <div class="stat-card"><div class="stat-num c-ok"    id="stat-ok">0</div><div class="stat-key">OK</div></div>
@@ -707,19 +711,9 @@ select:focus, input[type=date]:focus { border-color: var(--accent); box-shadow: 
 <!-- FOOTER -->
 <footer id="footer">
 
-  <!-- KIRI: OK, Not OK, Actual hari ini -->
+  <!-- KIRI: Today Actual -->
   <div class="ft-item">
-    <span class="ft-label">OK</span>
-    <span class="ft-val ft-ok" id="ft-ok-total">0</span>
-  </div>
-  <div class="ft-sep"></div>
-  <div class="ft-item">
-    <span class="ft-label">Not OK</span>
-    <span class="ft-val ft-nok" id="ft-nok-total">0</span>
-  </div>
-  <div class="ft-sep"></div>
-  <div class="ft-item">
-    <span class="ft-label">Actual</span>
+    <span class="ft-label">Today Actual</span>
     <span class="ft-val" id="ft-actual-total" style="color:var(--text-1)">0</span>
   </div>
 
@@ -729,15 +723,11 @@ select:focus, input[type=date]:focus { border-color: var(--accent); box-shadow: 
     <span class="ft-val" id="ft-center-label" style="color:var(--accent);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:180px;">—</span>
     <span style="color:var(--border-2)">·</span>
     <span class="ft-label">QTY Plan</span>
-    <span class="ft-val ft-qty" id="ft-qty-progress">—</span>
+    <span class="ft-qty-badge" id="ft-qty-plan-badge" style="display:none"></span>
+    <span class="ft-qty-progress" id="ft-qty-progress">—</span>
   </div>
 
-  <!-- KANAN: Waktu dan Uptime -->
-  <div class="ft-item">
-    <span class="ft-label">Uptime</span>
-    <span class="ft-val" id="ft-uptime">00:00:00</span>
-  </div>
-  <div class="ft-sep"></div>
+  <!-- KANAN: Waktu -->
   <div class="ft-item">
     <span class="ft-val" id="ft-date">—</span>
     <span style="color:var(--border-2)">·</span>
@@ -908,18 +898,6 @@ function saveQtyForLabel(label, qty){
 
 /* ──────────────────────────────────────────────────────────────────────────── */
 
-/* Auto-fit teks LABEL agar selalu muat 1 baris tanpa melebar */
-function fitLabelText(){
-  const lbl = el('stat-label');
-  if(!lbl) return;
-  const maxW = lbl.parentElement.clientWidth - 16;
-  let size = 35;
-  lbl.style.fontSize = size + 'px';
-  while(lbl.scrollWidth > maxW && size > 11){
-    size--;
-    lbl.style.fontSize = size + 'px';
-  }
-}
 
 /* State */
 const S = {
@@ -990,7 +968,6 @@ async function init(){
   S.qty_plan=sd.qty_plan||0;
   el('s-preset').value=S.preset; syncSettingLabel();
   el('s-qty-plan').value=S.qty_plan;
-  el('stat-qty-plan').textContent=S.qty_plan>0?S.qty_plan:'0';
   await refreshData();
 
   //--- CEK STATUS OCR MODEL ---
@@ -1066,7 +1043,7 @@ function setScanIndicator(visible) {
 /* Clock & DateTime */
 const DN=['Minggu','Senin','Selasa','Rabu','Kamis','Jumat','Sabtu'];
 const MN=['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
-const _pageStart = Date.now(); //waktu halaman dibuka untuk uptime
+const _pageStart = Date.now();
 
 function startClock(){
   const tick=()=>{
@@ -1077,13 +1054,6 @@ function startClock(){
     //footer: tanggal dan jam
     el('ft-date').textContent = dateStr;
     el('ft-time').textContent = timeStr;
-
-    //uptime
-    const sec = Math.floor((Date.now() - _pageStart) / 1000);
-    const hh = String(Math.floor(sec/3600)).padStart(2,'0');
-    const mm = String(Math.floor((sec%3600)/60)).padStart(2,'0');
-    const ss = String(sec%60).padStart(2,'0');
-    el('ft-uptime').textContent = `${hh}:${mm}:${ss}`;
   };
   tick(); setInterval(tick, 1000);
 }
@@ -1217,17 +1187,14 @@ function renderTable(records){
   S.records=records||[]; S.sel.clear();
   const tbody=el('code-tbody'), cnt=el('data-count');
 
-  //footer: total OK dan Not OK semua label hari ini
-  const allOk  = S.records.filter(r=>r.status==='OK').length;
-  const allNok = S.records.filter(r=>r.status==='Not OK').length;
-  el('ft-ok-total').textContent  = allOk;
-  el('ft-nok-total').textContent = allNok;
-  el('ft-actual-total').textContent = allOk + allNok;
+  //footer: Today Actual (total semua record hari ini)
+  el('ft-actual-total').textContent = S.records.length;
 
   if(!validLabel(S.label,S.preset)){
     tbody.innerHTML='<tr><td colspan="3" style="padding:28px;text-align:center;color:var(--text-3)">Pilih label terlebih dahulu</td></tr>';
     cnt.textContent='0 record';
-    el('stat-label').textContent='—'; fitLabelText(); ['stat-total','stat-ok','stat-nok'].forEach(id=>el(id).textContent='0');
+    ['stat-total','stat-ok','stat-nok'].forEach(id=>el(id).textContent='0');
+    el('ft-qty-plan-badge').textContent=''; el('ft-qty-plan-badge').style.display='none';
     el('ft-qty-progress').textContent='—';
     el('ft-center-label').textContent='—';
     return;
@@ -1252,14 +1219,15 @@ function renderTable(records){
       tbody.appendChild(tr);
     });
   }
-  el('stat-label').textContent=S.label||'—';
-  fitLabelText();
   el('stat-total').textContent=filtered.length;
   el('stat-ok').textContent=ok; el('stat-nok').textContent=nok;
 
-  //footer QTY Plan progress: OK label aktif / Plan
+  //footer QTY Plan progress: format badge kuning "51" lalu "- 21 / 51"
   const plan = S.qty_plan > 0 ? S.qty_plan : '?';
-  el('ft-qty-progress').textContent = `${ok} / ${plan}`;
+  const badge = el('ft-qty-plan-badge');
+  if(S.qty_plan > 0){ badge.textContent = plan; badge.style.display='inline'; }
+  else { badge.textContent=''; badge.style.display='none'; }
+  el('ft-qty-progress').textContent = S.qty_plan > 0 ? `${ok} / ${plan}` : `${ok} / ${plan}`;
   el('ft-center-label').textContent = S.label || '—';
 }
 
@@ -1318,8 +1286,6 @@ async function saveSetting(){
   const qty = Math.max(0, parseInt(el('s-qty-plan').value)||0);
   S.qty_plan = qty;
   if(qty > 0) saveQtyForLabel(l, qty);  //simpan untuk label baru ini
-
-  el('stat-qty-plan').textContent = qty > 0 ? qty : '0';
 
   await fetch('/api/qty_plan',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({qty_plan:S.qty_plan})});
   await fetch('/api/camera/settings',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({preset:S.preset,label:S.label,edge_mode:el('chk-edge').checked,split_mode:el('chk-split').checked})});
@@ -1474,7 +1440,6 @@ document.addEventListener('click', e=>{
 });
 
 init();
-window.addEventListener('resize', fitLabelText);
 </script>
 </body>
 </html>

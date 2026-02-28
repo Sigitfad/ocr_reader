@@ -261,9 +261,9 @@ def create_setting_dialog(parent, camera_combo, preset_combo, jis_type_combo, av
         if hasattr(parent, 'qty_plan'):
             parent.qty_plan = dialog_qty_spinbox.value()
 
-        #panggil handler untuk memperbarui tampilan QTY Plan di kotak statistik
-        if hasattr(parent, '_update_qty_plan_display'):
-            parent._update_qty_plan_display()
+        #panggil handler untuk memperbarui tampilan footer (QTY Plan badge + progress)
+        if hasattr(parent, '_update_footer_stats'):
+            parent._update_footer_stats()
         # ───────────────────────────────────────────────────────────────────
 
         dialog.accept()

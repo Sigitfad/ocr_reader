@@ -1,9 +1,5 @@
 @echo off
-<<<<<<< HEAD
-set PROJECT_DIR=C:\Users\sigitf\Documents\Project_Inspeksi\easyOCR\new_ocr\ocr_cap
-=======
-set PROJECT_DIR=C:\Users\ACER NITRO\OneDrive\Desktop\WEBOCR\ocrkarton
->>>>>>> 5d41a73aea816b3d946db1b23394795e56c486dd
+set PROJECT_DIR=C:\Users\ACER NITRO\OneDrive\Desktop\WEBOCR\ocr_reader
 
 echo Mengecek Python...
 python --version
@@ -27,8 +23,4 @@ echo Menjalankan aplikasi...
 cd /d "%PROJECT_DIR%"
 start /b cmd /c "timeout /t 3 >nul && start http://localhost:5000"
 python app.py
-<<<<<<< HEAD
 pause
-=======
-pause
->>>>>>> 5d41a73aea816b3d946db1b23394795e56c486dd

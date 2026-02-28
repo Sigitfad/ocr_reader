@@ -3,7 +3,8 @@ from PySide6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QGridLayout,
     QPushButton, QLabel, QRadioButton, QCheckBox, QGroupBox, QSpinBox,
     QMessageBox, QFileDialog, QTreeWidget, QTreeWidgetItem, QHeaderView, QDialog,
-    QComboBox, QDateEdit, QAbstractItemView, QCompleter, QFrame, QProgressDialog
+    QComboBox, QDateEdit, QAbstractItemView, QCompleter, QFrame, QProgressDialog,
+    QStatusBar
 )
 #import komponen inti Qt: sinyal, thread, timer, tanggal, dan locale
 from PySide6.QtCore import (
@@ -306,16 +307,19 @@ class MainWindow(QMainWindow):
         if self.logic and self.logic.check_daily_reset():
             QMessageBox.information(self, "Reset Data", f"Data deteksi telah di-reset untuk hari baru: {self.logic.current_date.strftime('%d-%m-%Y')}")
 
-        #format waktu dalam Bahasa Indonesia dan tampilkan di label
+        #format waktu dalam Bahasa Indonesia dan tampilkan di footer
         locale = QLocale(QLocale.Indonesian, QLocale.Indonesia)
-        formatted_time = locale.toString(now, "dddd, d MMMM yyyy, HH:mm:ss")
-
-        self.date_time_label.setText(formatted_time)
+        formatted_time = locale.toString(now, "dddd, d MMMM yyyy  HH:mm:ss")
+        self.ft_datetime_label.setText(formatted_time)
 
     #bangun keseluruhan layout ui: panel kiri (kontrol), area video tengah, panel kanan (data)
     def setup_ui(self):
         main_widget = QWidget()
         self.setCentralWidget(main_widget)
+
+        #buat footer bar lebih dulu agar widget ft_actual_label sudah tersedia
+        #sebelum _create_right_panel memanggil update_code_display
+        self._create_footer_bar()
 
         main_layout = QHBoxLayout(main_widget)
 
@@ -333,6 +337,112 @@ class MainWindow(QMainWindow):
 
         control_frame.setFixedWidth(CONTROL_PANEL_WIDTH)
         right_panel.setFixedWidth(RIGHT_PANEL_WIDTH)
+
+    #membuat footer bar di bagian bawah jendela (Today Actual, Label, QTY Plan, Tanggal/Jam)
+    def _create_footer_bar(self):
+        status_bar = QStatusBar(self)
+        status_bar.setSizeGripEnabled(False)
+        status_bar.setStyleSheet("""
+            QStatusBar {
+                background: #ffffff;
+                border-top: 1px solid #e2e5ea;
+                font-family: 'Montserrat', Arial, sans-serif;
+                font-size: 13px;
+            }
+            QStatusBar::item { border: none; }
+        """)
+        self.setStatusBar(status_bar)
+
+        def ft_label(text):
+            lbl = QLabel(text)
+            lbl.setStyleSheet("color: #9aa0b0; font-weight: 600; font-size: 12px; letter-spacing: 1px; font-family: 'Montserrat', Arial, sans-serif;")
+            return lbl
+
+        def ft_sep():
+            sep = QLabel("|")
+            sep.setStyleSheet("color: #d0d4dc; padding: 0 6px;")
+            return sep
+
+        #wrapper utama yang mengisi seluruh lebar status bar
+        ft_wrap = QWidget()
+        ft_wrap_layout = QHBoxLayout(ft_wrap)
+        ft_wrap_layout.setContentsMargins(8, 0, 8, 0)
+        ft_wrap_layout.setSpacing(0)
+
+        #--- KIRI: Today Actual ---
+        left_widget = QWidget()
+        left_layout = QHBoxLayout(left_widget)
+        left_layout.setContentsMargins(0, 0, 0, 0)
+        left_layout.setSpacing(6)
+
+        left_layout.addWidget(ft_label("Today Actual"))
+        self.ft_actual_label = QLabel("0")
+        self.ft_actual_label.setStyleSheet("font-weight: 700; font-size: 16px; color: #1a1d23; font-family: 'Montserrat', Arial, sans-serif;")
+        left_layout.addWidget(self.ft_actual_label)
+        left_layout.addStretch(1)  #dorong konten ke kiri, sisa ruang diisi stretch
+
+        #--- TENGAH: Label aktif · QTY Plan badge kuning + progress biru ---
+        center_widget = QWidget()
+        center_layout = QHBoxLayout(center_widget)
+        center_layout.setContentsMargins(0, 0, 0, 0)
+        center_layout.setSpacing(6)
+        center_layout.setAlignment(Qt.AlignCenter)
+
+        center_layout.addWidget(ft_label("Label"))
+        self.ft_label_val = QLabel("—")
+        self.ft_label_val.setStyleSheet("font-weight: 700; font-size: 16px; color: #2563eb; font-family: 'Montserrat', Arial, sans-serif;")
+        center_layout.addWidget(self.ft_label_val)
+
+        dot = QLabel("·")
+        dot.setStyleSheet("color: #d0d4dc; padding: 0 4px;")
+        center_layout.addWidget(dot)
+
+        center_layout.addWidget(ft_label("QTY Plan"))
+
+        self.ft_qty_badge = QLabel("")
+        self.ft_qty_badge.setStyleSheet("""
+            background-color: #facc15;
+            color: #1a1a1a;
+            font-weight: 700;
+            font-size: 16px;
+            padding: 1px 8px;
+            border-radius: 4px;
+            font-family: 'Montserrat', Arial, sans-serif;
+        """)
+        self.ft_qty_badge.setVisible(False)
+        center_layout.addWidget(self.ft_qty_badge)
+
+        self.ft_qty_progress = QLabel("")
+        self.ft_qty_progress.setStyleSheet("""
+            background-color: #2196f3;
+            color: #ffffff;
+            font-weight: 700;
+            font-size: 16px;
+            padding: 1px 8px;
+            border-radius: 4px;
+            font-family: 'Montserrat', Arial, sans-serif;
+        """)
+        self.ft_qty_progress.setVisible(False)
+        center_layout.addWidget(self.ft_qty_progress)
+
+        #--- KANAN: Tanggal dan Jam ---
+        right_widget = QWidget()
+        right_layout = QHBoxLayout(right_widget)
+        right_layout.setContentsMargins(0, 0, 0, 0)
+        right_layout.setSpacing(0)
+        right_layout.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
+
+        self.ft_datetime_label = QLabel("—")
+        self.ft_datetime_label.setStyleSheet("font-weight: 500; font-size: 13px; color: #1a1d23; font-family: 'Montserrat', Arial, sans-serif;")
+        right_layout.addStretch(1)  #dorong konten ke kanan
+        right_layout.addWidget(self.ft_datetime_label)
+
+        #susun kiri-tengah-kanan dengan stretch sama agar tengah benar-benar di tengah
+        ft_wrap_layout.addWidget(left_widget, 1)
+        ft_wrap_layout.addWidget(center_widget, 1)
+        ft_wrap_layout.addWidget(right_widget, 1)
+
+        status_bar.addWidget(ft_wrap, 1)
 
     #membuat panel kontrol kiri: tombol setting, opsi tampilan, toggle kamera, scan file, statistik
     def _create_control_panel(self):
@@ -564,68 +674,7 @@ class MainWindow(QMainWindow):
         stats_layout.setContentsMargins(10, 15, 10, 10)
         stats_layout.setSpacing(8)
 
-        # ── BARIS: LABEL (kiri) dan QTY PLAN (kanan) bersebelahan ─────────────
-        label_qty_row = QWidget()
-        label_qty_layout = QHBoxLayout(label_qty_row)
-        label_qty_layout.setContentsMargins(0, 0, 0, 0)
-        label_qty_layout.setSpacing(8)
-
-        #box LABEL: menampilkan label target yang sedang aktif
-        self.label_box = QGroupBox("LABEL")
-        self.label_box.setFont(QFont("Arial", 8, QFont.Bold))
-        self.label_box.setStyleSheet("""
-            QGroupBox {
-                border: 1px solid #666;
-                border-radius: 6px;
-                margin-top: 8px;
-                padding-top: 5px;
-            }
-            QGroupBox::title {
-                subcontrol-origin: margin;
-                left: 30px;
-                padding: 2px 3px;
-                color: black;
-            }
-        """)
-        label_box_layout = QVBoxLayout(self.label_box)
-        label_box_layout.setContentsMargins(5, 10, 5, 5)
-
-        self.label_display = QLabel(". . .")
-        self.label_display.setFont(QFont("Arial", 10, QFont.Bold))
-        self.label_display.setAlignment(Qt.AlignCenter)
-        self.label_display.setStyleSheet("border: none; color: blue;")
-        label_box_layout.addWidget(self.label_display)
-
-        #box QTY PLAN: menampilkan target jumlah produksi dari Setting
-        self.qty_plan_box = QGroupBox("QTY Plan")
-        self.qty_plan_box.setFont(QFont("Arial", 8, QFont.Bold))
-        self.qty_plan_box.setStyleSheet("""
-            QGroupBox {
-                border: 1px solid #666;
-                border-radius: 6px;
-                margin-top: 8px;
-                padding-top: 5px;
-            }
-            QGroupBox::title {
-                subcontrol-origin: margin;
-                left: 16px;
-                padding: 2px 3px;
-                color: black;
-            }
-        """)
-        qty_plan_box_layout = QVBoxLayout(self.qty_plan_box)
-        qty_plan_box_layout.setContentsMargins(5, 10, 5, 5)
-
-        self.qty_plan_display = QLabel("0")
-        self.qty_plan_display.setFont(QFont("Arial", 10, QFont.Bold))
-        self.qty_plan_display.setAlignment(Qt.AlignCenter)
-        self.qty_plan_display.setStyleSheet("border: none; color: #999999;")
-        qty_plan_box_layout.addWidget(self.qty_plan_display)
-
-        label_qty_layout.addWidget(self.label_box, 1)
-        label_qty_layout.addWidget(self.qty_plan_box, 1)
-        # ──────────────────────────────────────────────────────────────────────
-
+        # ── BARIS: TOTAL, OK, NOT OK ───────────────────────────────────────────
         #box 2: menampilkan total semua deteksi untuk label aktif hari ini
         self.total_box = QGroupBox("TOTAL")
         self.total_box.setFont(QFont("Arial", 8, QFont.Bold))
@@ -713,27 +762,38 @@ class MainWindow(QMainWindow):
         bottom_layout.addWidget(self.ok_box)
         bottom_layout.addWidget(self.not_ok_box)
 
-        stats_layout.addWidget(label_qty_row)
         stats_layout.addWidget(self.total_box)
         stats_layout.addWidget(bottom_row)
 
         parent_layout.addWidget(outer_stats_box)
 
-    #perbarui tampilan semua angka statistik (label, total, OK, Not OK)
+    #perbarui tampilan semua angka statistik (total, OK, Not OK)
     def update_statistics_display(self, label_text, total_count, ok_count, not_ok_count):
-        self.label_display.setText(str(label_text))
         self.total_display.setText(str(total_count))
         self.ok_display.setText(str(ok_count))
         self.not_ok_display.setText(str(not_ok_count))
+        #update footer: Today Actual dan QTY Plan progress
+        self._update_footer_stats(ok_count)
 
-    #perbarui tampilan kotak QTY Plan di statistik setelah Save Setting
-    def _update_qty_plan_display(self):
-        if self.qty_plan > 0:
-            self.qty_plan_display.setText(str(self.qty_plan))
-            self.qty_plan_display.setStyleSheet("border: none; color: #0000AA;")
+    #perbarui tampilan footer: Today Actual dan QTY Plan badge+progress
+    def _update_footer_stats(self, ok_count=None):
+        #Today Actual: total semua record hari ini (semua label)
+        if self.logic:
+            actual = len(self.logic.detected_codes)
         else:
-            self.qty_plan_display.setText("0")
-            self.qty_plan_display.setStyleSheet("border: none; color: #999999;")
+            actual = 0
+        self.ft_actual_label.setText(str(actual))
+
+        #badge QTY Plan kuning dan progress biru
+        if self.qty_plan > 0:
+            self.ft_qty_badge.setText(str(self.qty_plan))
+            self.ft_qty_badge.setVisible(True)
+            ok_val = ok_count if ok_count is not None else 0
+            self.ft_qty_progress.setText(f"{ok_val} / {self.qty_plan}")
+            self.ft_qty_progress.setVisible(True)
+        else:
+            self.ft_qty_badge.setVisible(False)
+            self.ft_qty_progress.setVisible(False)
 
     #perbarui tampilan teks ocr mentah di panel kiri (OUTPUT TEXT)
     def update_all_text_display(self, text_list):
@@ -763,12 +823,14 @@ class MainWindow(QMainWindow):
             self.selected_type_label.setText("Pilih Label Terlebih Dahulu")
             self.selected_type_label.setStyleSheet("color: #FF6600; font-weight: normal; border: none;")
             self.update_statistics_display(". . .", 0, 0, 0)
+            self.ft_label_val.setText("—")
             if self.logic:
                 self.logic.set_target_label("")
         else:
             #label valid -> set target di logika dan perbarui tampilan
             self.selected_type_label.setText(f"Selected: {text}")
             self.selected_type_label.setStyleSheet("color: #28a745; font-weight: bold; border: none;")
+            self.ft_label_val.setText(text)
             if self.logic:
                 self.logic.set_target_label(text)
 
@@ -786,13 +848,8 @@ class MainWindow(QMainWindow):
         self.btn_export.clicked.connect(self.open_export_dialog)
         layout.addWidget(self.btn_export)
 
-        #label jam real-time yang diperbarui setiap detik
-        self.date_time_label = QLabel("Memuat Tanggal...")
-        self.date_time_label.setFont(QFont("Arial", 10))
-        layout.addWidget(self.date_time_label)
-
         label_barang = QLabel("Data Barang :")
-        label_barang.setFont(QFont("Arial", 11, QFont.Bold))
+        label_barang.setFont(QFont("Montserrat", 11, QFont.Bold))
         layout.addWidget(label_barang)
 
         #tree widget untuk menampilkan daftar record deteksi hari ini
@@ -807,6 +864,17 @@ class MainWindow(QMainWindow):
         self.code_tree.setStyleSheet("""
             QTreeWidget {
                 border: 1px solid #ddd;
+            }
+            QTreeWidget::item:selected {
+                background-color: #000000;
+                color: #ffffff;
+            }
+            QTreeWidget::item:selected:hover {
+                background-color: #1c1f1f;
+                color: #ffffff;
+            }
+            QTreeWidget::item:hover:!selected {
+                background-color: #244747;
             }
             QScrollBar:vertical {
                 border: none;
@@ -1363,7 +1431,7 @@ class MainWindow(QMainWindow):
         #fungsi yang dipanggil saat tombol export di dalam dialog diklik
         def handle_export_click():
             import threading
-            from datetime import timedelta, time as py_time
+            from datetime import timedelta
 
             start_date = None
             end_date = None
@@ -1412,15 +1480,15 @@ class MainWindow(QMainWindow):
                 if start_date:
                     start_date_str_db = start_date.strftime("%Y-%m-%d %H:%M:%S")
                     end_date_str_db = end_date.strftime("%Y-%m-%d %H:%M:%S")
-                    start_date_str_id = start_date.strftime("%d-%m-%Y %H:%M:%S")
-                    end_date_str_id = end_date.strftime("%d-%m-%Y %H:%M:%S")
-                    #format deskripsi tanggal yang tampil di header excel
+                    #format deskripsi tanggal yang tampil di header excel — sama persis dengan app.py
                     if range_key == "Today":
                         date_range_desc = start_date.strftime('%d-%m-%Y')
-                    elif range_key in ["CustomDate", "Month"] and start_date.time() == py_time.min and end_date.time() == py_time(23, 59, 59):
-                        date_range_desc = f"{start_date.strftime('%d-%m-%Y')} s/d {end_date.strftime('%d-%m-%Y')}"
+                    elif range_key == "Month":
+                        date_range_desc = f"{month_name}_{year}"
+                    elif range_key == "CustomDate":
+                        date_range_desc = f"{start_date.strftime('%Y-%m-%d')}_to_{end_date.strftime('%Y-%m-%d')}"
                     else:
-                        date_range_desc = f"{start_date_str_id} s/d {end_date_str_id}"
+                        date_range_desc = f"{start_date.strftime('%d-%m-%Y')} s/d {end_date.strftime('%d-%m-%Y')}"
                     sql_filter = f"WHERE timestamp BETWEEN '{start_date_str_db}' AND '{end_date_str_db}'"
 
                 #tambahkan filter preset ke klausa sql
@@ -1466,6 +1534,13 @@ class MainWindow(QMainWindow):
 
                 self.progress_dialog.show()
 
+                #QTY Plan hanya ditampilkan jika "Hari Ini" DAN label spesifik dipilih (bukan All Label)
+                selected_export_label_for_qty = dialog.export_label_type_combo.currentText() if dialog.export_label_filter_enabled.isChecked() else ""
+                show_qty_plan = (
+                    range_key == 'Today' and
+                    selected_export_label_for_qty not in ['All Label', '', None]
+                )
+
                 #jalankan proses export di background thread agar ui tetap responsif
                 threading.Thread(
                     target=self._execute_export_thread,
@@ -1474,7 +1549,8 @@ class MainWindow(QMainWindow):
                         date_range_desc,
                         dialog.export_label_type_combo.currentText() if dialog.export_label_filter_enabled.isChecked() else "",
                         selected_export_preset,
-                        self.qty_plan   #kirim nilai QTY Plan ke fungsi export
+                        self.qty_plan,   #kirim nilai QTY Plan ke fungsi export
+                        show_qty_plan    #flag apakah QTY Plan ditampilkan di excel
                     ),
                     daemon=True
                 ).start()
@@ -1498,7 +1574,7 @@ class MainWindow(QMainWindow):
             self.btn_export.setEnabled(True)
 
     #fungsi yang dijalankan di background thread untuk eksekusi proses export excel
-    def _execute_export_thread(self, sql_filter, date_range_desc, export_label="", current_preset="", qty_plan=0):
+    def _execute_export_thread(self, sql_filter, date_range_desc, export_label="", current_preset="", qty_plan=0, show_qty_plan=True):
         from export import execute_export
 
         if not self.logic:
@@ -1509,7 +1585,7 @@ class MainWindow(QMainWindow):
         def progress_callback(current, total, message):
             self.export_progress_signal.emit(message, f"{current}")
 
-        result = execute_export(sql_filter, date_range_desc, export_label, current_preset, progress_callback, qty_plan=qty_plan)
+        result = execute_export(sql_filter, date_range_desc, export_label, current_preset, progress_callback, qty_plan=qty_plan, show_qty_plan=show_qty_plan)
 
         self.export_result_signal.emit(result)  #kirim hasil ke ui thread via sinyal
 

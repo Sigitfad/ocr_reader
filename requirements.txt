@@ -1,17 +1,13 @@
-flask==2.3.3 #framework web berbasis Python untuk membuat aplikasi web dan API.s
-flask-socketio==5.3.6 #ekstensi Flask untuk komunikasi real-time (WebSocket)
-opencv-python==4.10.0.84 #library pengolahan citra (image processing), digunakan untuk membaca, memanipulasi, preprocessing gambar sebelum OCR.
-easyocr==1.7.2 #library OCR (Optical Character Recognition) untuk membaca teks dari gambar.
-pandas==2.2.3 #library untuk mengelola dan memproses data dalam bentuk tabel (DataFrame).
-openpyxl==3.1.5 #library untuk membaca dan menulis file excel (.xlsx).
-XlsxWriter==3.2.0 #library alternatif untuk membuat file excel dengan fitur format yang lebih lengkap.
-Pillow==11.1.0 #library pengolahan gambar (PIL), digunakan untuk membuka, mengedit, dan menyimpan gambar.
-numpy==1.26.4 #library komputasi numerik untuk array dan matrix, menjadi dasar banyak operasi OpenCV, OCR, dan image processing.
-PySide6==6.8.1 #framework GUI berbasis Qt untuk membuat aplikasi desktop Python.
-torch==2.1.2 #library deep learning (PyTorch), menjadi backend untuk easyocr.
-torchvision==0.16.2 #ekstensi PyTorch untuk pengolahan gambar dan model computer vision.
-<<<<<<< HEAD
-torchaudio==2.1.2 #ekstensi PyTorch untuk pengolahan audio (tidak selalu wajib untuk ocr,tapi bagian dari ekosistem PyTorch).
-=======
-torchaudio==2.1.2 #ekstensi PyTorch untuk pengolahan audio (tidak selalu wajib untuk ocr,tapi bagian dari ekosistem PyTorch).
->>>>>>> 5d41a73aea816b3d946db1b23394795e56c486dd
+flask==2.3.3
+flask-socketio==5.3.6
+opencv-python==4.10.0.84
+easyocr==1.7.2
+pandas==2.2.3
+openpyxl==3.1.5
+XlsxWriter==3.2.0
+Pillow==11.1.0
+numpy==1.26.4
+PySide6==6.8.1
+torch==2.5.1
+torchvision==0.20.1
+torchaudio==2.5.1
