@@ -1,5 +1,5 @@
 @echo off
-set PROJECT_DIR=C:\Users\ACER NITRO\OneDrive\Desktop\WEBOCR\ocr_reader
+set PROJECT_DIR=C:\Users\sigitf\Documents\Project_Inspeksi\easyOCR\fix_ocr\ocr_newcap
 
 echo Mengecek Python...
 python --version

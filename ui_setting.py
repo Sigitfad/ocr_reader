@@ -1,4 +1,3 @@
-#import komponen widget PySide6 yang dibutuhkan untuk membangun dialog setting
 from PySide6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QGroupBox, QComboBox, QPushButton,
     QLabel, QCompleter, QSpinBox
@@ -7,19 +6,10 @@ from PySide6.QtCore import Qt
 from PySide6.QtGui import QFont
 from config import JIS_TYPES, DIN_TYPES
 
-
-#untuk membuat dan mengembalikan dialog QDialog untuk pengaturan kamera, preset, label, dan QTY Plan
-#parameter:
-#parent            -> jendela induk (MainWindow)
-#camera_combo      -> combo kamera di MainWindow (akan diperbarui saat SAVE)
-#preset_combo      -> combo preset di MainWindow (akan diperbarui saat SAVE)
-#jis_type_combo    -> combo label di MainWindow (akan diperbarui saat SAVE)
-#available_cameras -> daftar kamera yang tersedia (tidak digunakan langsung, untuk referensi)
-#current_qty_plan  -> nilai QTY Plan saat ini dari MainWindow (untuk sinkronisasi)
 def create_setting_dialog(parent, camera_combo, preset_combo, jis_type_combo, available_cameras, current_qty_plan=0):
     dialog = QDialog(parent)
     dialog.setWindowTitle("SETTING")
-    dialog.setFixedSize(250, 335)  #ukuran diperbesar untuk menampung grup QTY Plan
+    dialog.setFixedSize(250, 335)
 
     main_layout = QVBoxLayout(dialog)
     main_layout.setSpacing(8)
@@ -41,7 +31,6 @@ def create_setting_dialog(parent, camera_combo, preset_combo, jis_type_combo, av
             padding: 1 3px;
         }
     """
-
     combo_style = """
         QComboBox {
             border: 1px solid #ccc;
@@ -51,7 +40,6 @@ def create_setting_dialog(parent, camera_combo, preset_combo, jis_type_combo, av
             font-size: 12px;
         }
     """
-
     spinbox_style = """
         QSpinBox {
             border: 1px solid #ccc;
@@ -67,7 +55,6 @@ def create_setting_dialog(parent, camera_combo, preset_combo, jis_type_combo, av
         }
     """
 
-    #grup pilihan kamera
     camera_group = QGroupBox("Select Camera")
     camera_group.setFont(QFont("Arial", 9, QFont.Bold))
     camera_group.setStyleSheet(group_style)
@@ -84,7 +71,6 @@ def create_setting_dialog(parent, camera_combo, preset_combo, jis_type_combo, av
     camera_layout.addWidget(dialog_camera_combo)
     main_layout.addWidget(camera_group)
 
-    #baris tengah: grup "Tipe" (kiri) dan grup "Select Label" (kanan)
     preset_label_row = QHBoxLayout()
     preset_label_row.setSpacing(8)
 
@@ -151,7 +137,6 @@ def create_setting_dialog(parent, camera_combo, preset_combo, jis_type_combo, av
 
     main_layout.addLayout(preset_label_row)
 
-    # ── GRUP QTY PLAN (di bawah Tipe dan Label) ───────────────────────────────
     qty_plan_group = QGroupBox("QTY Plan")
     qty_plan_group.setFont(QFont("Arial", 9, QFont.Bold))
     qty_plan_group.setStyleSheet(group_style)
@@ -163,10 +148,9 @@ def create_setting_dialog(parent, camera_combo, preset_combo, jis_type_combo, av
     qty_plan_info_label.setFont(QFont("Arial", 9))
     qty_plan_info_label.setStyleSheet("border: none; background: transparent; color: #333;")
 
-    #spinbox untuk input angka QTY Plan (range 0 - 999999)
     dialog_qty_spinbox = QSpinBox()
     dialog_qty_spinbox.setRange(0, 999999)
-    dialog_qty_spinbox.setValue(current_qty_plan)  #sinkronkan dengan nilai saat ini
+    dialog_qty_spinbox.setValue(current_qty_plan)
     dialog_qty_spinbox.setStyleSheet(spinbox_style)
     dialog_qty_spinbox.setAlignment(Qt.AlignmentFlag.AlignCenter)
     dialog_qty_spinbox.setFixedWidth(120)
@@ -176,7 +160,6 @@ def create_setting_dialog(parent, camera_combo, preset_combo, jis_type_combo, av
     qty_plan_layout.addStretch()
 
     main_layout.addWidget(qty_plan_group)
-    # ─────────────────────────────────────────────────────────────────────────
 
     def update_label_options_in_dialog(preset_choice):
         dialog_label_combo.blockSignals(True)
@@ -218,7 +201,6 @@ def create_setting_dialog(parent, camera_combo, preset_combo, jis_type_combo, av
     main_layout.addWidget(save_btn)
 
     def save_settings():
-        #update kamera
         camera_combo.blockSignals(True)
         camera_combo.setCurrentIndex(dialog_camera_combo.currentIndex())
         camera_combo.blockSignals(False)
@@ -257,14 +239,11 @@ def create_setting_dialog(parent, camera_combo, preset_combo, jis_type_combo, av
         if hasattr(parent, 'on_jis_type_changed'):
             parent.on_jis_type_changed(jis_type_combo.currentText())
 
-        # ── SIMPAN QTY PLAN KE MainWindow ──────────────────────────────────
         if hasattr(parent, 'qty_plan'):
             parent.qty_plan = dialog_qty_spinbox.value()
 
-        #panggil handler untuk memperbarui tampilan footer (QTY Plan badge + progress)
         if hasattr(parent, '_update_footer_stats'):
             parent._update_footer_stats()
-        # ───────────────────────────────────────────────────────────────────
 
         dialog.accept()
 
@@ -273,7 +252,7 @@ def create_setting_dialog(parent, camera_combo, preset_combo, jis_type_combo, av
     dialog.camera_combo  = dialog_camera_combo
     dialog.preset_combo  = dialog_preset_combo
     dialog.label_combo   = dialog_label_combo
-    dialog.qty_spinbox   = dialog_qty_spinbox   #spinbox QTY Plan
+    dialog.qty_spinbox   = dialog_qty_spinbox
     dialog.save_btn      = save_btn
 
     return dialog
